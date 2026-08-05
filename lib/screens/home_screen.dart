@@ -6,6 +6,7 @@ import '../models/todo.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/fluid_background.dart';
+import '../widgets/animated_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,10 +21,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _editController = TextEditingController();
 
   List<Todo> _todos = [];
-  String _currentFilter = 'all'; // all, active, completed
+  String _currentFilter = 'all';
   String _selectedPriority = 'medium';
   String? _editingId;
   Timer? _saveTimer;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -41,7 +43,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadTodos() async {
     final todos = await _storage.loadTodos();
-    setState(() => _todos = todos);
+    setState(() {
+      _todos = todos;
+      _isLoading = false;
+    });
   }
 
   void _saveTodos() {
@@ -54,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _addTodo() {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
+    HapticFeedback.mediumImpact();
     setState(() {
       _todos.insert(0, Todo(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -76,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _deleteTodo(String id) {
+    HapticFeedback.heavyImpact();
     setState(() => _todos.removeWhere((t) => t.id == id));
     _saveTodos();
   }
@@ -105,14 +112,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _clearCompleted() {
+    HapticFeedback.mediumImpact();
     setState(() => _todos.removeWhere((t) => t.completed));
     _saveTodos();
   }
 
   List<Todo> get _filteredTodos {
-    if (_currentFilter == 'active') return _todos.where((t) => !t.completed).toList();
-    if (_currentFilter == 'completed') return _todos.where((t) => t.completed).toList();
-    return List.from(_todos);
+    List<Todo> result;
+    if (_currentFilter == 'active') {
+      result = _todos.where((t) => !t.completed).toList();
+    } else if (_currentFilter == 'completed') {
+      result = _todos.where((t) => t.completed).toList();
+    } else {
+      result = List.from(_todos);
+    }
+    result.sort((a, b) {
+      if (a.completed != b.completed) return a.completed ? 1 : -1;
+      final order = {'high': 0, 'medium': 1, 'low': 2};
+      final cmp = (order[a.priority] ?? 1).compareTo(order[b.priority] ?? 1);
+      if (cmp != 0) return cmp;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return result;
   }
 
   int get _total => _todos.length;
@@ -125,19 +146,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Fluid background
           const FluidBackground(),
-
-          // Main content
           SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 24,
-                ),
-                child: _buildGlassPanel(),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: _buildGlassPanel(),
             ),
           ),
         ],
@@ -146,47 +159,59 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGlassPanel() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 640),
-          decoration: BoxDecoration(
-            color: AppTheme.glassBg,
-            border: Border.all(color: AppTheme.glassBorder),
-            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x66000000),
-                blurRadius: 32,
-                offset: Offset(0, 8),
-              ),
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, 30 * (1 - value)),
+            child: child,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHeader(),
-              _buildAddSection(),
-              _buildFilterSection(),
-              _buildTodoList(),
-              const SizedBox(height: 8),
-            ],
+        );
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0x8C14121B),
+              border: Border.all(color: const Color(0x14FFFFFF)),
+              borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 40,
+                  offset: Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _buildHeader(),
+                _buildAddSection(),
+                _buildFilterSection(),
+                Expanded(child: _buildTodoList()),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  // ==================== Header ====================
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
       decoration: const BoxDecoration(
         border: Border(
           bottom: BorderSide(color: Color(0x0FFFFFFF), width: 1),
@@ -194,86 +219,108 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
+          // Brand row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppTheme.accent, Color(0xFFC934E1)],
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x4DF62C55),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.water_drop_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
+                  _buildLogo(),
+                  const SizedBox(width: 12),
                   const Text(
                     'FlowDo',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.4,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
                       color: AppTheme.textPrimary,
                     ),
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0x0DFFFFFF),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0x14FFFFFF)),
-                ),
-                child: Text(
-                  _formatDate(),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
+              _buildDateBadge(),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
+          // Stats
           Row(
             children: [
               _buildStatItem('进行中', _activeCount, AppTheme.statActive),
+              _buildDivider(),
               _buildStatItem('已完成', _doneCount, AppTheme.statDone),
+              _buildDivider(),
               _buildStatItem('总计', _total, AppTheme.statTotal),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: _progress,
-              minHeight: 4,
-              backgroundColor: const Color(0x0FFFFFFF),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.statDone),
-            ),
-          ),
+          const SizedBox(height: 14),
+          // Progress bar
+          _buildProgressBar(),
         ],
       ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.elasticOut,
+      builder: (context, value, child) {
+        return Transform.scale(scale: value, child: child);
+      },
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppTheme.accent, Color(0xFFC934E1)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.accent.withValues(alpha: 0.4),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.water_drop_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0x0DFFFFFF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0x14FFFFFF)),
+      ),
+      child: Text(
+        _formatDate(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textSecondary,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      height: 28,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      color: const Color(0x0FFFFFFF),
     );
   }
 
@@ -281,14 +328,21 @@ class _HomeScreenState extends State<HomeScreen> {
     return Expanded(
       child: Column(
         children: [
-          Text(
-            '$value',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: value),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOut,
+            builder: (context, val, _) {
+              return Text(
+                '$val',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 2),
           Text(
@@ -296,8 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
             style: const TextStyle(
               fontSize: 11,
               color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.6,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
             ),
           ),
         ],
@@ -305,17 +359,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildProgressBar() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: _progress),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: value,
+            minHeight: 5,
+            backgroundColor: const Color(0x0FFFFFFF),
+            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.statDone),
+          ),
+        );
+      },
+    );
+  }
+
+  // ==================== Add Section ====================
   Widget _buildAddSection() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
       child: Row(
         children: [
           Expanded(
             child: Container(
-              height: 44,
+              height: 50,
               decoration: BoxDecoration(
-                color: AppTheme.inputBg,
-                border: Border.all(color: AppTheme.inputBorder),
+                color: const Color(0x0DFFFFFF),
+                border: Border.all(color: const Color(0x14FFFFFF)),
                 borderRadius: BorderRadius.circular(AppTheme.radiusMd),
               ),
               child: Row(
@@ -324,11 +398,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: TextField(
                       controller: _inputController,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 15,
                         color: AppTheme.textPrimary,
                       ),
                       decoration: const InputDecoration(
-                        hintText: '添加待办事项...',
+                        hintText: '输入待办事项...',
                         hintStyle: TextStyle(color: AppTheme.textQuaternary),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(horizontal: 16),
@@ -336,128 +410,71 @@ class _HomeScreenState extends State<HomeScreen> {
                       onSubmitted: (_) => _addTodo(),
                     ),
                   ),
-                  // Priority selector
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Row(
-                      children: ['high', 'medium', 'low'].map((p) {
-                        final color = AppTheme.priorityColor(p);
-                        final isActive = _selectedPriority == p;
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedPriority = p),
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            margin: const EdgeInsets.only(left: 6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: color,
-                              border: Border.all(
-                                color: color,
-                                width: 2,
-                              ),
-                              boxShadow: isActive
-                                  ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 6)]
-                                  : null,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                  AnimatedPrioritySelector(
+                    selected: _selectedPriority,
+                    onChanged: (p) => setState(() => _selectedPriority = p),
                   ),
+                  const SizedBox(width: 10),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          GestureDetector(
-            onTap: _addTodo,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.accent,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-          ),
+          const SizedBox(width: 12),
+          GlassSubmitButton(onPressed: _addTodo),
         ],
       ),
     );
   }
 
+  // ==================== Filter Section ====================
   Widget _buildFilterSection() {
-    final filters = [
-      ('all', '全部', _total),
-      ('active', '进行中', _activeCount),
-      ('completed', '已完成', _doneCount),
-    ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 0, 28, 16),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            padding: const EdgeInsets.all(3),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: const Color(0x0AFFFFFF),
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
             child: Row(
-              children: filters.map((f) {
-                final isActive = _currentFilter == f.$1;
-                return GestureDetector(
-                  onTap: () => setState(() => _currentFilter = f.$1),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isActive ? const Color(0x1FFFFFFF) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          f.$2,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isActive
-                                ? AppTheme.textPrimary
-                                : AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${f.$3}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isActive
-                                ? AppTheme.textSecondary
-                                : AppTheme.textQuaternary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+              children: [
+                AnimatedFilterTab(
+                  label: '全部',
+                  count: _total,
+                  isActive: _currentFilter == 'all',
+                  onTap: () => setState(() => _currentFilter = 'all'),
+                ),
+                AnimatedFilterTab(
+                  label: '进行中',
+                  count: _activeCount,
+                  isActive: _currentFilter == 'active',
+                  onTap: () => setState(() => _currentFilter = 'active'),
+                ),
+                AnimatedFilterTab(
+                  label: '已完成',
+                  count: _doneCount,
+                  isActive: _currentFilter == 'completed',
+                  onTap: () => setState(() => _currentFilter = 'completed'),
+                ),
+              ],
             ),
           ),
           if (_doneCount > 0)
             GestureDetector(
               onTap: _clearCompleted,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Text(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
                   '清除已完成',
                   style: TextStyle(
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     color: AppTheme.textQuaternary,
                   ),
                 ),
@@ -468,29 +485,70 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ==================== Todo List ====================
   Widget _buildTodoList() {
-    final filtered = _filteredTodos;
-    // Sort: incomplete first, then by priority, then by createdAt desc
-    filtered.sort((a, b) {
-      if (a.completed != b.completed) return a.completed ? 1 : -1;
-      final order = {'high': 0, 'medium': 1, 'low': 2};
-      final cmp = (order[a.priority] ?? 1).compareTo(order[b.priority] ?? 1);
-      if (cmp != 0) return cmp;
-      return b.createdAt.compareTo(a.createdAt);
-    });
-
-    if (filtered.isEmpty) {
-      return _buildEmptyState();
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppTheme.accent,
+          strokeWidth: 2,
+        ),
+      );
     }
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 400),
-      child: ListView.separated(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
+    final filtered = _filteredTodos;
+
+    if (filtered.isEmpty) {
+      return Center(child: _buildEmptyState());
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: ListView.builder(
+        key: ValueKey(_currentFilter),
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
         itemCount: filtered.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) => _buildTodoItem(filtered[index]),
+        itemBuilder: (context, index) {
+          return _buildAnimatedTodoItem(filtered[index], index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildAnimatedTodoItem(Todo todo, int index) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 300 + index * 50),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(-20 * (1 - value), 0),
+            child: child,
+          ),
+        );
+      },
+      child: Dismissible(
+        key: ValueKey(todo.id),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          decoration: BoxDecoration(
+            color: AppTheme.priorityHigh.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          ),
+          child: const Icon(Icons.delete_outline, color: AppTheme.priorityHigh, size: 24),
+        ),
+        confirmDismiss: (direction) async {
+          HapticFeedback.heavyImpact();
+          return true;
+        },
+        onDismissed: (direction) => _deleteTodo(todo.id),
+        child: _buildTodoItem(todo),
       ),
     );
   }
@@ -500,11 +558,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final priorityColor = AppTheme.priorityColor(todo.priority);
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: todo.completed
-            ? const Color(0x06FFFFFF)
-            : AppTheme.itemBg,
-        border: Border.all(color: AppTheme.itemBorder),
+        color: todo.completed ? const Color(0x06FFFFFF) : const Color(0x0DFFFFFF),
+        border: Border.all(
+          color: todo.completed ? const Color(0x08FFFFFF) : const Color(0x12FFFFFF),
+        ),
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       ),
       child: IntrinsicHeight(
@@ -512,138 +571,39 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Priority bar
-            Container(
-              width: 3,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 4,
               decoration: BoxDecoration(
-                color: priorityColor.withValues(
-                  alpha: todo.completed ? 0.4 : 1.0,
-                ),
+                color: priorityColor.withValues(alpha: todo.completed ? 0.3 : 1.0),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(AppTheme.radiusMd),
                   bottomLeft: Radius.circular(AppTheme.radiusMd),
                 ),
+                boxShadow: todo.completed ? [] : [
+                  BoxShadow(
+                    color: priorityColor.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
             ),
+            // Content
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 14, 8, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isEditing) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _editController,
-                              autofocus: true,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.textPrimary,
-                              ),
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              onSubmitted: (_) => _saveEdit(),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: _saveEdit,
-                            child: const Padding(
-                              padding: EdgeInsets.all(4),
-                              child: Icon(Icons.check, size: 18, color: AppTheme.priorityLow),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: _cancelEdit,
-                            child: const Padding(
-                              padding: EdgeInsets.all(4),
-                              child: Icon(Icons.close, size: 18, color: AppTheme.priorityHigh),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ] else ...[
-                      // Todo text
-                      Text(
-                        todo.text,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: todo.completed
-                              ? AppTheme.textQuaternary
-                              : AppTheme.textPrimary,
-                          decoration: todo.completed
-                              ? TextDecoration.lineThrough
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Meta info
-                      Row(
-                        children: [
-                          Text(
-                            _formatTime(todo.createdAt),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: todo.completed
-                                  ? AppTheme.textQuaternary
-                                  : AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: priorityColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              AppTheme.priorityLabel(todo.priority),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: priorityColor.withValues(
-                                  alpha: todo.completed ? 0.4 : 1.0,
-                                ),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+                child: _buildTodoContent(todo, isEditing, priorityColor),
               ),
             ),
-            // Checkbox
-            if (!isEditing)
-              GestureDetector(
-                onTap: () => _toggleTodo(todo.id),
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  margin: const EdgeInsets.only(top: 14, right: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: todo.completed
-                          ? AppTheme.priorityLow
-                          : const Color(0x33FFFFFF),
-                      width: 2,
-                    ),
-                    color: todo.completed
-                        ? AppTheme.priorityLow
-                        : Colors.transparent,
-                  ),
-                  child: todo.completed
-                      ? const Icon(Icons.check, size: 14, color: Colors.white)
-                      : null,
+            // Right actions
+            if (!isEditing) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: AnimatedTodoCheckbox(
+                  checked: todo.completed,
+                  onChanged: (_) => _toggleTodo(todo.id),
                 ),
               ),
-            // Action buttons
-            if (!isEditing)
               Padding(
                 padding: const EdgeInsets.only(top: 12, right: 8),
                 child: Row(
@@ -652,26 +612,120 @@ class _HomeScreenState extends State<HomeScreen> {
                     GestureDetector(
                       onTap: () => _startEdit(todo.id),
                       child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.edit_outlined, size: 16, color: AppTheme.textSecondary),
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.edit_outlined, size: 18, color: AppTheme.textSecondary),
                       ),
                     ),
                     GestureDetector(
                       onTap: () => _deleteTodo(todo.id),
                       child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.delete_outline, size: 16, color: AppTheme.textSecondary),
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.delete_outline, size: 18, color: AppTheme.textSecondary),
                       ),
                     ),
                   ],
                 ),
               ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Widget _buildTodoContent(Todo todo, bool isEditing, Color priorityColor) {
+    if (isEditing) {
+      return Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _editController,
+              autofocus: true,
+              style: const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onSubmitted: (_) => _saveEdit(),
+            ),
+          ),
+          GestureDetector(
+            onTap: _saveEdit,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.priorityLow.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.check, size: 18, color: AppTheme.priorityLow),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _cancelEdit,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.priorityHigh.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.close, size: 18, color: AppTheme.priorityHigh),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 300),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: todo.completed ? AppTheme.textQuaternary : AppTheme.textPrimary,
+            decoration: todo.completed ? TextDecoration.lineThrough : TextDecoration.none,
+            decorationColor: AppTheme.textQuaternary,
+            decorationThickness: 2.0,
+          ),
+          child: Text(todo.text),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Text(
+              _formatTime(todo.createdAt),
+              style: TextStyle(
+                fontSize: 11,
+                color: todo.completed ? AppTheme.textQuaternary : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: priorityColor.withValues(alpha: todo.completed ? 0.08 : 0.18),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                AppTheme.priorityLabel(todo.priority),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: priorityColor.withValues(alpha: todo.completed ? 0.4 : 1.0),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ==================== Empty State ====================
   Widget _buildEmptyState() {
     String title, desc;
     if (_todos.isEmpty) {
@@ -685,38 +739,42 @@ class _HomeScreenState extends State<HomeScreen> {
       desc = '完成一些待办后将会显示在这里';
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 28),
-      child: Column(
-        children: [
-          Icon(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.elasticOut,
+          builder: (context, value, child) {
+            return Transform.scale(scale: value, child: child);
+          },
+          child: Icon(
             Icons.task_alt_rounded,
-            size: 48,
-            color: Colors.white.withValues(alpha: 0.15),
+            size: 56,
+            color: Colors.white.withValues(alpha: 0.12),
           ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
-            ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textSecondary,
           ),
-          const SizedBox(height: 4),
-          Text(
-            desc,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textQuaternary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          desc,
+          style: const TextStyle(fontSize: 13, color: AppTheme.textQuaternary),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
+  // ==================== Utils ====================
   String _formatDate() {
     final now = DateTime.now();
     const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
