@@ -2,12 +2,11 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-/// Fluid animated background replicating Mercury Music's WebGL shader.
+/// Fluid animated background using GPU Fragment Shader.
 ///
-/// Uses layered radial gradients with [BlendMode.plus] for additive color
-/// blending, creating a genuine "liquid light" feel. Multiple animated blobs
-/// with different speeds, sizes and Lissajous movement patterns overlap and
-/// blend additively, producing the flowing liquid effect.
+/// Ports the exact Mercury Music WebGL shader (simplex noise domain warping)
+/// to Flutter's FragmentProgram for GPU-accelerated liquid rendering.
+/// Falls back to a CustomPainter approximation if the shader fails to load.
 class FluidBackground extends StatefulWidget {
   const FluidBackground({super.key});
 
@@ -18,14 +17,39 @@ class FluidBackground extends StatefulWidget {
 class _FluidBackgroundState extends State<FluidBackground>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  FragmentShader? _shader;
+  bool _shaderLoaded = false;
+  Offset _mouse = const Offset(0.5, 0.5);
+  Offset _targetMouse = const Offset(0.5, 0.5);
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 60),
     )..repeat();
+    _loadShader();
+  }
+
+  Future<void> _loadShader() async {
+    try {
+      final program = await FragmentProgram.fromAsset('shaders/fluid.frag');
+      _shader = program.fragmentShader();
+      if (mounted) setState(() => _shaderLoaded = true);
+    } catch (e) {
+      // Fallback to CustomPainter if shader fails to compile
+      debugPrint('Shader load failed, using fallback: $e');
+    }
+  }
+
+  void _updateMouse(Offset position, Size size) {
+    if (size.width > 0 && size.height > 0) {
+      _targetMouse = Offset(
+        position.dx / size.width,
+        1.0 - position.dy / size.height,
+      );
+    }
   }
 
   @override
@@ -36,22 +60,85 @@ class _FluidBackgroundState extends State<FluidBackground>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return CustomPaint(
-          painter: _FluidPainter(_controller.value),
-          size: Size.infinite,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        return MouseRegion(
+          onHover: (event) => _updateMouse(event.position, size),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              // Smooth mouse interpolation
+              _mouse = Offset(
+                _mouse.dx + (_targetMouse.dx - _mouse.dx) * 0.05,
+                _mouse.dy + (_targetMouse.dy - _mouse.dy) * 0.05,
+              );
+
+              if (_shaderLoaded && _shader != null) {
+                return CustomPaint(
+                  painter: _ShaderPainter(
+                    shader: _shader!,
+                    time: _controller.value * 60,
+                    size: size,
+                    mouse: _mouse,
+                  ),
+                  size: size,
+                );
+              }
+              // Fallback: animated gradient background
+              return CustomPaint(
+                painter: _FallbackPainter(_controller.value),
+                size: size,
+              );
+            },
+          ),
         );
       },
     );
   }
 }
 
-class _FluidPainter extends CustomPainter {
+/// GPU shader painter - runs the exact same GLSL as the original WebGL version.
+class _ShaderPainter extends CustomPainter {
+  final FragmentShader shader;
+  final double time;
+  final Size size;
+  final Offset mouse;
+
+  _ShaderPainter({
+    required this.shader,
+    required this.time,
+    required this.size,
+    required this.mouse,
+  });
+
+  @override
+  void paint(Canvas canvas, Size canvasSize) {
+    final dpr = PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final pixelW = canvasSize.width * dpr;
+    final pixelH = canvasSize.height * dpr;
+
+    shader.setFloat(0, time); // u_time
+    shader.setFloat(1, pixelW); // u_resolution.x
+    shader.setFloat(2, pixelH); // u_resolution.y
+    shader.setFloat(3, mouse.dx); // u_mouse.x
+    shader.setFloat(4, mouse.dy); // u_mouse.y
+    shader.setFloat(5, 0.0); // u_isLightMode (dark mode)
+
+    final paint = Paint()..shader = shader;
+    canvas.drawRect(Offset.zero & canvasSize, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShaderPainter oldDelegate) => true;
+}
+
+/// Fallback painter when GPU shader is unavailable.
+/// Uses layered radial gradients with additive blending to approximate the fluid effect.
+class _FallbackPainter extends CustomPainter {
   final double t;
 
-  _FluidPainter(this.t);
+  _FallbackPainter(this.t);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -59,7 +146,7 @@ class _FluidPainter extends CustomPainter {
     final h = size.height;
     final time = t * 2 * pi;
 
-    // ---- Layer 0: Deep dark base ----
+    // Deep dark base
     final bgPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
@@ -73,65 +160,32 @@ class _FluidPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bgPaint);
 
-    // ---- Layer 1: Large soft color blobs (additive blending) ----
-    // These are the "liquid" bodies - large, slow, heavily blurred
-    final liquidBlobs = <_Blob>[
-      // Yellow - top left, slow drift
-      _Blob(
-        color: const Color(0xFFFAF099),
-        cx: 0.15 + sin(time * 0.15) * 0.08 + cos(time * 0.07) * 0.05,
-        cy: 0.25 + cos(time * 0.12) * 0.06,
-        radius: 0.55,
-        alpha: 0.35,
-      ),
-      // Orange - right side, medium drift
-      _Blob(
-        color: const Color(0xFFFA7308),
-        cx: 0.85 + cos(time * 0.18) * 0.10 + sin(time * 0.09) * 0.04,
-        cy: 0.35 + sin(time * 0.14) * 0.08,
-        radius: 0.50,
-        alpha: 0.30,
-      ),
-      // Pink - center-right, flowing
-      _Blob(
-        color: const Color(0xFFE62673),
-        cx: 0.60 + sin(time * 0.10) * 0.12,
-        cy: 0.55 + cos(time * 0.22) * 0.10,
-        radius: 0.48,
-        alpha: 0.28,
-      ),
-      // Purple - left-bottom, slow rise
-      _Blob(
-        color: const Color(0xFF591AB3),
-        cx: 0.25 + cos(time * 0.13) * 0.10,
-        cy: 0.70 + sin(time * 0.17) * 0.08,
-        radius: 0.52,
-        alpha: 0.32,
-      ),
-      // Blue fringe - bottom right
-      _Blob(
-        color: const Color(0xFF4A88FF),
-        cx: 0.75 + sin(time * 0.11) * 0.08,
-        cy: 0.80 + cos(time * 0.19) * 0.06,
-        radius: 0.45,
-        alpha: 0.20,
-      ),
-      // Hot pink accent - center, fast small
-      _Blob(
-        color: const Color(0xFFFF2D6F),
-        cx: 0.45 + cos(time * 0.25) * 0.07,
-        cy: 0.40 + sin(time * 0.28) * 0.05,
-        radius: 0.30,
-        alpha: 0.25,
-      ),
+    // Color blobs with domain-warping approximation
+    final colors = [
+      const Color(0xFFFAF099), // yellow
+      const Color(0xFFFA7308), // orange
+      const Color(0xFFE62673), // pink
+      const Color(0xFF591AB3), // purple
     ];
 
-    // Draw liquid blobs with additive blending
-    for (final blob in liquidBlobs) {
-      final cx = blob.cx * w;
-      final cy = blob.cy * h;
-      // Make radius proportional to screen diagonal for consistent look
-      final r = blob.radius * sqrt(w * w + h * h) * 0.5;
+    final positions = [
+      Offset(0.2 + sin(time * 0.32) * 0.12, 0.4 + cos(time * 0.26) * 0.11),
+      Offset(0.8 + cos(time * 0.38) * 0.12, 0.4 + sin(time * 0.30) * 0.11),
+      Offset(0.7 + sin(time * 0.20) * 0.16, 0.2 + cos(time * 0.44) * 0.11),
+      Offset(0.3 + cos(time * 0.26) * 0.16, 0.1 + sin(time * 0.34) * 0.11),
+    ];
+
+    final alphas = [0.45, 0.38, 0.35, 0.40];
+    final radii = [0.55, 0.50, 0.48, 0.52];
+
+    for (int i = 0; i < 4; i++) {
+      // Add noise-like distortion to position
+      final noiseX = sin(time * 0.18 + i * 1.7) * 0.05;
+      final noiseY = cos(time * 0.25 + i * 2.3) * 0.05;
+
+      final cx = (positions[i].dx + noiseX) * w;
+      final cy = (positions[i].dy + noiseY) * h;
+      final r = radii[i] * sqrt(w * w + h * h) * 0.5;
 
       final paint = Paint()
         ..blendMode = BlendMode.plus
@@ -139,9 +193,9 @@ class _FluidPainter extends CustomPainter {
           center: Alignment.center,
           radius: 1.0,
           colors: [
-            blob.color.withValues(alpha: blob.alpha),
-            blob.color.withValues(alpha: blob.alpha * 0.5),
-            blob.color.withValues(alpha: 0),
+            colors[i].withValues(alpha: alphas[i]),
+            colors[i].withValues(alpha: alphas[i] * 0.5),
+            colors[i].withValues(alpha: 0),
           ],
           stops: [0.0, 0.4, 1.0],
         ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r));
@@ -149,35 +203,7 @@ class _FluidPainter extends CustomPainter {
       canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
     }
 
-    // ---- Layer 2: Flowing wave distortion (simulated with shifted blobs) ----
-    // Create a second pass of smaller, faster blobs that add "flow" energy
-    for (int i = 0; i < 4; i++) {
-      final phase = time * (0.3 + i * 0.08);
-      final cx = (0.2 + i * 0.2 + sin(phase) * 0.15) * w;
-      final cy = (0.3 + cos(phase * 0.7 + i) * 0.2 + i * 0.05) * h;
-      final r = 0.25 * sqrt(w * w + h * h) * 0.5;
-
-      final colors = [
-        const Color(0xFFFAF099),
-        const Color(0xFFFA7308),
-        const Color(0xFFE62673),
-        const Color(0xFF591AB3),
-      ];
-      final paint = Paint()
-        ..blendMode = BlendMode.plus
-        ..shader = RadialGradient(
-          center: Alignment.center,
-          radius: 1.0,
-          colors: [
-            colors[i].withValues(alpha: 0.15),
-            colors[i].withValues(alpha: 0),
-          ],
-          stops: [0.0, 1.0],
-        ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r));
-      canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
-    }
-
-    // ---- Layer 3: Breath fade (vertical) ----
+    // Vertical breathing fade
     final breath = 0.5 + 0.5 * sin(time * 0.55);
     final fadePaint = Paint()
       ..shader = LinearGradient(
@@ -194,7 +220,7 @@ class _FluidPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), fadePaint);
 
-    // ---- Layer 4: Vignette ----
+    // Vignette
     final vignettePaint = Paint()
       ..shader = RadialGradient(
         center: Alignment.center,
@@ -208,33 +234,8 @@ class _FluidPainter extends CustomPainter {
         stops: [0.0, 0.4, 0.7, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), vignettePaint);
-
-    // ---- Layer 5: Film grain ----
-    final random = Random(42 + (t * 60).toInt());
-    final grainPaint = Paint()..color = Colors.white.withValues(alpha: 0.012);
-    for (int i = 0; i < 150; i++) {
-      final x = random.nextDouble() * w;
-      final y = random.nextDouble() * h;
-      canvas.drawCircle(Offset(x, y), 0.5, grainPaint);
-    }
   }
 
   @override
-  bool shouldRepaint(covariant _FluidPainter oldDelegate) => true;
-}
-
-class _Blob {
-  final Color color;
-  final double cx;
-  final double cy;
-  final double radius;
-  final double alpha;
-
-  _Blob({
-    required this.color,
-    required this.cx,
-    required this.cy,
-    required this.radius,
-    required this.alpha,
-  });
+  bool shouldRepaint(covariant _FallbackPainter oldDelegate) => true;
 }

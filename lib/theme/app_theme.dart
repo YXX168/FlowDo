@@ -8,10 +8,12 @@ class AppTheme {
   // Accent
   static const Color accent = Color(0xFFF62C55);
   static const Color accentHover = Color(0xFFFF4069);
+  static const Color accentPurple = Color(0xFFC934E1);
 
   // Text
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0x99FFFFFF);
+  static const Color textTertiary = Color(0x73FFFFFF);
   static const Color textQuaternary = Color(0x59FFFFFF);
 
   // Border
@@ -32,6 +34,12 @@ class AppTheme {
   static const Color statDone = Color(0xFF6BAB45);
   static const Color statTotal = Color(0xFF4A88FF);
 
+  // Categories
+  static const Color catWork = Color(0xFF4A88FF);
+  static const Color catPersonal = Color(0xFFC934E1);
+  static const Color catShopping = Color(0xFFFAAD14);
+  static const Color catOther = Color(0xFF6BAB45);
+
   // Shader colors
   static const Color shaderCore = Color(0xFFFFFFFF);
   static const Color shaderFringe = Color(0xFF4A88FF);
@@ -50,6 +58,12 @@ class AppTheme {
   static const double radiusMd = 12.0;
   static const double radiusLg = 16.0;
   static const double radiusXl = 24.0;
+
+  // Animation durations
+  static const Duration animFast = Duration(milliseconds: 150);
+  static const Duration animNormal = Duration(milliseconds: 300);
+  static const Duration animSlow = Duration(milliseconds: 500);
+  static const Duration animSlower = Duration(milliseconds: 800);
 
   static String priorityLabel(String priority) {
     switch (priority) {
@@ -74,6 +88,45 @@ class AppTheme {
         return priorityLow;
       default:
         return priorityMedium;
+    }
+  }
+
+  static String categoryLabel(String category) {
+    switch (category) {
+      case 'work':
+        return '工作';
+      case 'personal':
+        return '个人';
+      case 'shopping':
+        return '购物';
+      default:
+        return '其他';
+    }
+  }
+
+  static Color categoryColor(String category) {
+    switch (category) {
+      case 'work':
+        return catWork;
+      case 'personal':
+        return catPersonal;
+      case 'shopping':
+        return catShopping;
+      default:
+        return catOther;
+    }
+  }
+
+  static IconData categoryIcon(String category) {
+    switch (category) {
+      case 'work':
+        return Icons.work_outline_rounded;
+      case 'personal':
+        return Icons.person_outline_rounded;
+      case 'shopping':
+        return Icons.shopping_bag_outlined;
+      default:
+        return Icons.category_outlined;
     }
   }
 }

@@ -28,11 +28,21 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Verify Flutter version
+        run: flutter --version
+
       - name: Generate Android project structure
         run: flutter create --platforms android --org com.flowdo --project-name flowdo .
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Verify shader assets
+        run: |
+          echo "=== Checking shader files ==="
+          ls -la shaders/
+          echo "=== Pubspec shader declaration ==="
+          grep -A2 "shaders:" pubspec.yaml
 
       - name: Build APK (ARM64)
         run: flutter build apk --target-platform android-arm64 --split-per-abi --release
