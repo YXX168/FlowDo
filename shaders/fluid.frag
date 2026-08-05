@@ -69,7 +69,7 @@ float fbm(vec2 p) {
   return v;
 }
 
-void fragmentMain() {
+void main() {
   // Use FlutterFragCoord for pixel coordinates
   vec2 uv = FlutterFragCoord().xy / u_resolution.xy;
   vec2 st = uv - 0.5;
