@@ -1,7 +1,7 @@
 name: flowdo
 description: "FlowDo - Fluid Todo App with GPU liquid shader background for Android ARM64"
 publish_to: 'none'
-version: 2.2.0+3
+version: 2.3.0+4
 
 environment:
   sdk: ^3.5.0
@@ -15,8 +15,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/flowdo-icon-foreground.png
   shaders:
     - shaders/fluid.frag

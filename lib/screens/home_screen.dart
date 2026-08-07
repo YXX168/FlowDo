@@ -430,27 +430,27 @@ class _HomeScreenState extends State<HomeScreen> {
         return Transform.scale(scale: value, child: child);
       },
       child: Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.accent, AppTheme.accentPurple],
-          ),
+          color: const Color(0xFF221D2E),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: const Color(0x24FFFFFF)),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.accent.withValues(alpha: 0.4),
-              blurRadius: 14,
+              color: AppTheme.accentPurple.withValues(alpha: 0.28),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: const Icon(
-          Icons.water_drop_rounded,
-          color: Colors.white,
-          size: 20,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Image.asset(
+            'assets/icon/flowdo-icon-foreground.png',
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
         ),
       ),
     );

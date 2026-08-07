@@ -89,10 +89,10 @@ void main() {
   warpedUV += vec2(n2 * 0.06);
 
   // ===== Color palette (exact match from original) =====
-  vec3 colOrange = vec3(0.98, 0.45, 0.08);
-  vec3 colYellow = vec3(0.98, 0.80, 0.15);
-  vec3 colPurple = vec3(0.35, 0.10, 0.70);
-  vec3 colPink = vec3(0.90, 0.15, 0.45);
+  vec3 colOrange = vec3(0.68, 0.25, 0.06);
+  vec3 colYellow = vec3(0.68, 0.52, 0.12);
+  vec3 colPurple = vec3(0.28, 0.07, 0.52);
+  vec3 colPink = vec3(0.66, 0.10, 0.34);
 
   // ===== Blob positions with organic movement =====
   vec2 pYellow  = vec2(0.2 + sin(u_time * 0.32) * 0.12, 0.78 + cos(u_time * 0.26) * 0.08);
@@ -106,10 +106,11 @@ void main() {
   float wPink   = 1.0 - smoothstep(0.0, 0.58, distance(warpedUV, pPink));
   float wPurple = 1.0 - smoothstep(0.0, 0.64, distance(warpedUV, pPurple));
 
-  vec3 color = colYellow * (wYellow * 1.2)
-             + colOrange * (wOrange * 1.0)
-             + colPink * (wPink * 0.9)
-             + colPurple * (wPurple * 1.1);
+  vec3 color = colYellow * (wYellow * 0.72)
+             + colOrange * (wOrange * 0.70)
+             + colPink * (wPink * 0.68)
+             + colPurple * (wPurple * 0.82);
+  color = color / (vec3(1.0) + color * 0.45);
 
   // ===== Vertical breathing fade =====
   float breath = 0.5 + 0.5 * sin(u_time * 0.55);

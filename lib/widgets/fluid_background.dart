@@ -213,7 +213,7 @@ class _FallbackPainter extends CustomPainter {
       Offset(0.3 + cos(time * 0.26) * 0.16, 0.70 + sin(time * 0.34) * 0.09),
     ];
 
-    final alphas = [0.45, 0.38, 0.35, 0.40];
+    final alphas = [0.22, 0.18, 0.17, 0.21];
     final radii = [0.42, 0.40, 0.36, 0.40];
 
     for (int i = 0; i < 4; i++) {

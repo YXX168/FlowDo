@@ -45,6 +45,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Restore official release signing key
+        env:
+          FLOWDO_KEYSTORE_BASE64: ${{ secrets.FLOWDO_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$FLOWDO_KEYSTORE_BASE64"
+          printf '%s' "$FLOWDO_KEYSTORE_BASE64" | base64 --decode > android/app/flowdo-release.p12
+          chmod 600 android/app/flowdo-release.p12
+          python tool/configure_android_release.py android/app/build.gradle.kts
+
       - name: Analyze source
         run: flutter analyze
 
@@ -52,7 +64,29 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Build APK (ARM64)
+        env:
+          FLOWDO_KEYSTORE_PATH: ${{ github.workspace }}/android/app/flowdo-release.p12
+          FLOWDO_KEYSTORE_PASSWORD: ${{ secrets.FLOWDO_KEYSTORE_PASSWORD }}
+          FLOWDO_KEY_ALIAS: ${{ secrets.FLOWDO_KEY_ALIAS }}
+          FLOWDO_KEY_PASSWORD: ${{ secrets.FLOWDO_KEY_PASSWORD }}
+          FLOWDO_KEYSTORE_TYPE: ${{ secrets.FLOWDO_KEYSTORE_TYPE }}
         run: flutter build apk --target-platform android-arm64 --split-per-abi --release
+
+      - name: Verify official APK signature
+        env:
+          EXPECTED_CERT_SHA256: ${{ secrets.FLOWDO_CERT_SHA256 }}
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          "$APKSIGNER" verify --verbose "$APK"
+          ACTUAL_CERT_SHA256=$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-256 digest/ {print toupper($2); exit}')
+          PACKAGE_NAME=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          test -n "$EXPECTED_CERT_SHA256"
+          test "$ACTUAL_CERT_SHA256" = "$EXPECTED_CERT_SHA256"
+          test "$PACKAGE_NAME" = "com.flowdo.flowdo"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6
