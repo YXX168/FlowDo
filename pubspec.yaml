@@ -1,7 +1,7 @@
 name: flowdo
 description: "FlowDo - Fluid Todo App with GPU liquid shader background for Android ARM64"
 publish_to: 'none'
-version: 2.1.0+2
+version: 2.2.0+3
 
 environment:
   sdk: ^3.5.0

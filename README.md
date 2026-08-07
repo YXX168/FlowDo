@@ -4,8 +4,8 @@ Fluid Todo App for Android (ARM64) built with Flutter.
 
 ## Features
 
-- Liquid animated background (replicated from Mercury Music login page)
-- Glassmorphism UI card
+- Bottom-weighted liquid animated background
+- Layered, lightweight glass panels optimized for narrow screens
 - Priority-based todo management (High / Medium / Low)
 - Filter tabs (All / Active / Completed)
 - Statistics with progress bar

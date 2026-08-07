@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/todo.dart';
@@ -278,8 +277,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const FluidBackground(),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _buildGlassPanel(),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: _buildPageContent(),
             ),
           ),
         ],
@@ -287,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGlassPanel() {
+  Widget _buildPageContent() {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 600),
@@ -301,33 +300,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0x8C14121B),
-              border: Border.all(color: const Color(0x14FFFFFF)),
-              borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 40,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildAddSection(),
-                _buildFilterSection(),
-                Expanded(child: _buildTodoList()),
-              ],
-            ),
-          ),
-        ),
+      child: Column(
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 12),
+          _buildAddSection(),
+          const SizedBox(height: 8),
+          _buildFilterSection(),
+          const SizedBox(height: 4),
+          Expanded(child: _buildTodoList()),
+        ],
       ),
     );
   }
@@ -335,11 +317,18 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== Header ====================
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 14),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0x0FFFFFFF), width: 1),
-        ),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xD91A1724),
+        border: Border.all(color: const Color(0x1AFFFFFF)),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -350,15 +339,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildLogo(),
                   const SizedBox(width: 12),
-                  ShimmerText(
-                    text: 'FlowDo',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                    baseColor: AppTheme.textPrimary,
-                    highlightColor: AppTheme.accent.withValues(alpha: 0.8),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'FlowDo',
+                        style: TextStyle(
+                          fontSize: 21,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        '把今天理顺',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textTertiary,
+                        ),
+                      ),
+                    ],
                   ),
                   const Spacer(),
                   _buildStorageStatus(),
@@ -371,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
             children: [
               _buildStatItem('进行中', _activeCount, AppTheme.statActive),
@@ -381,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildStatItem('总计', _total, AppTheme.statTotal),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           AnimatedProgressBar(progress: _progress),
         ],
       ),
@@ -453,11 +457,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchToggle() {
-    return Semantics(
-      button: true,
-      label: _isSearchVisible ? '关闭搜索' : '搜索待办事项',
-      child: GestureDetector(
-      onTap: () {
+    return IconButton(
+      onPressed: () {
         HapticFeedback.lightImpact();
         setState(() {
           _isSearchVisible = !_isSearchVisible;
@@ -467,26 +468,23 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         });
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
+      tooltip: _isSearchVisible ? '关闭搜索' : '搜索待办事项',
+      style: IconButton.styleFrom(
+        backgroundColor: _isSearchVisible
+            ? AppTheme.accent.withValues(alpha: 0.15)
+            : const Color(0x0DFFFFFF),
+        side: BorderSide(
           color: _isSearchVisible
-              ? AppTheme.accent.withValues(alpha: 0.15)
-              : const Color(0x0DFFFFFF),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _isSearchVisible
-                ? AppTheme.accent.withValues(alpha: 0.4)
-                : const Color(0x14FFFFFF),
-          ),
+              ? AppTheme.accent.withValues(alpha: 0.4)
+              : const Color(0x14FFFFFF),
         ),
-        child: Icon(
-          _isSearchVisible ? Icons.close_rounded : Icons.search_rounded,
-          size: 16,
-          color: _isSearchVisible ? AppTheme.accent : AppTheme.textSecondary,
-        ),
+        minimumSize: const Size(40, 40),
+        padding: EdgeInsets.zero,
       ),
+      icon: Icon(
+        _isSearchVisible ? Icons.close_rounded : Icons.search_rounded,
+        size: 19,
+        color: _isSearchVisible ? AppTheme.accent : AppTheme.textSecondary,
       ),
     );
   }
@@ -556,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Container(
-                height: 40,
+                height: 44,
                 decoration: BoxDecoration(
                   color: const Color(0x0DFFFFFF),
                   border: Border.all(color: const Color(0x14FFFFFF)),
@@ -565,19 +563,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: TextField(
                   controller: _searchController,
                   autofocus: true,
+                  textAlignVertical: TextAlignVertical.center,
                   style: const TextStyle(
                     fontSize: 14,
                     color: AppTheme.textPrimary,
                   ),
                   decoration: const InputDecoration(
                     hintText: '搜索待办事项...',
-                    hintStyle: TextStyle(color: AppTheme.textQuaternary, fontSize: 14),
+                    hintStyle: TextStyle(
+                      color: AppTheme.textQuaternary,
+                      fontSize: 14,
+                    ),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 14),
+                    contentPadding: EdgeInsets.only(right: 14),
                     prefixIcon: Icon(
                       Icons.search_rounded,
                       size: 18,
                       color: AppTheme.textQuaternary,
+                    ),
+                    prefixIconConstraints: BoxConstraints(
+                      minWidth: 42,
+                      minHeight: 44,
                     ),
                     isDense: true,
                   ),
@@ -590,8 +596,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ==================== Add Section ====================
   Widget _buildAddSection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xB31A1724),
+        border: Border.all(color: const Color(0x14FFFFFF)),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+      ),
       child: Column(
         children: [
           // Search bar (conditionally visible)
@@ -599,7 +610,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_isSearchVisible) const SizedBox(height: 8),
           // Input row
           Container(
-            height: 50,
+            height: 52,
             decoration: BoxDecoration(
               color: const Color(0x0DFFFFFF),
               border: Border.all(color: const Color(0x14FFFFFF)),
@@ -610,6 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _inputController,
+                    textAlignVertical: TextAlignVertical.center,
                     style: const TextStyle(
                       fontSize: 15,
                       color: AppTheme.textPrimary,
@@ -618,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       hintText: '输入待办事项...',
                       hintStyle: TextStyle(color: AppTheme.textQuaternary),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 14),
                     ),
                     onSubmitted: (_) => _addTodo(),
                   ),
@@ -664,7 +676,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== Filter Section ====================
   Widget _buildFilterSection() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
           Expanded(
@@ -740,7 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
       switchOutCurve: Curves.easeIn,
       child: ReorderableListView.builder(
         key: ValueKey('${_currentFilter}_$_searchQuery'),
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
         itemCount: filtered.length,
         buildDefaultDragHandles: false,
         onReorderItem: _reorderTodos,
@@ -799,15 +811,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: todo.completed ? const Color(0x06FFFFFF) : const Color(0x0DFFFFFF),
+        color: todo.completed
+            ? const Color(0xA614121B)
+            : const Color(0xD91A1724),
         border: Border.all(
-          color: todo.completed ? const Color(0x08FFFFFF) : const Color(0x12FFFFFF),
+          color: todo.completed
+              ? const Color(0x0FFFFFFF)
+              : const Color(0x1AFFFFFF),
         ),
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       ),
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Priority bar with glow
             AnimatedContainer(
@@ -836,8 +852,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             // Right actions
             if (!isEditing) ...[
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
+              Align(
+                alignment: Alignment.center,
                 child: AnimatedTodoCheckbox(
                   checked: todo.completed,
                   onChanged: (_) => _toggleTodo(todo.id),
@@ -848,8 +864,8 @@ class _HomeScreenState extends State<HomeScreen> {
               if (total > 1)
                 ReorderableDragStartListener(
                   index: index,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 14, right: 4),
+                  child: SizedBox(
+                    width: 34,
                     child: Icon(
                       Icons.drag_indicator_rounded,
                       size: 18,
@@ -858,15 +874,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.only(top: 2, right: 2),
-                child: IconButton(
-                  onPressed: () => _startEdit(todo.id),
-                  tooltip: '编辑',
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(
-                    Icons.edit_outlined,
-                    size: 16,
-                    color: AppTheme.textSecondary,
+                padding: const EdgeInsets.only(right: 2),
+                child: Align(
+                  alignment: Alignment.center,
+                  child: IconButton(
+                    onPressed: () => _startEdit(todo.id),
+                    tooltip: '编辑',
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: 17,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ),
               ),
@@ -894,27 +917,35 @@ class _HomeScreenState extends State<HomeScreen> {
               onSubmitted: (_) => _saveEdit(),
             ),
           ),
-          GestureDetector(
-            onTap: _saveEdit,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppTheme.priorityLow.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.check, size: 18, color: AppTheme.priorityLow),
+          IconButton(
+            onPressed: _saveEdit,
+            tooltip: '保存',
+            style: IconButton.styleFrom(
+              backgroundColor:
+                  AppTheme.priorityLow.withValues(alpha: 0.15),
+              minimumSize: const Size(40, 40),
+              padding: EdgeInsets.zero,
+            ),
+            icon: const Icon(
+              Icons.check_rounded,
+              size: 19,
+              color: AppTheme.priorityLow,
             ),
           ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: _cancelEdit,
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppTheme.priorityHigh.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.close, size: 18, color: AppTheme.priorityHigh),
+          const SizedBox(width: 4),
+          IconButton(
+            onPressed: _cancelEdit,
+            tooltip: '取消',
+            style: IconButton.styleFrom(
+              backgroundColor:
+                  AppTheme.priorityHigh.withValues(alpha: 0.15),
+              minimumSize: const Size(40, 40),
+              padding: EdgeInsets.zero,
+            ),
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 19,
+              color: AppTheme.priorityHigh,
             ),
           ),
         ],
@@ -937,7 +968,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Text(todo.text),
         ),
         const SizedBox(height: 6),
-        Row(
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             // Time
             Text(
@@ -947,7 +981,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: todo.completed ? AppTheme.textQuaternary : AppTheme.textSecondary,
               ),
             ),
-            const SizedBox(width: 8),
             // Priority tag
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -965,7 +998,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 6),
             // Category tag
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -1067,8 +1099,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== Utils ====================
   String _formatDate() {
     final now = DateTime.now();
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return '${now.day} ${months[now.month - 1]} ${now.year}';
+    const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+    return '${now.month}月${now.day}日  周${weekdays[now.weekday - 1]}';
   }
 
   String _formatTime(int timestamp) {

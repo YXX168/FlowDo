@@ -95,16 +95,16 @@ void main() {
   vec3 colPink = vec3(0.90, 0.15, 0.45);
 
   // ===== Blob positions with organic movement =====
-  vec2 pYellow  = vec2(0.2 + sin(u_time * 0.32) * 0.12, -0.1 + cos(u_time * 0.26) * 0.11);
-  vec2 pOrange  = vec2(0.8 + cos(u_time * 0.38) * 0.12, -0.1 + sin(u_time * 0.30) * 0.11);
-  vec2 pPink    = vec2(0.7 + sin(u_time * 0.20) * 0.16, 0.30 + cos(u_time * 0.44) * 0.11);
-  vec2 pPurple  = vec2(0.3 + cos(u_time * 0.26) * 0.16, 0.40 + sin(u_time * 0.34) * 0.11);
+  vec2 pYellow  = vec2(0.2 + sin(u_time * 0.32) * 0.12, 0.78 + cos(u_time * 0.26) * 0.08);
+  vec2 pOrange  = vec2(0.8 + cos(u_time * 0.38) * 0.12, 0.86 + sin(u_time * 0.30) * 0.08);
+  vec2 pPink    = vec2(0.7 + sin(u_time * 0.20) * 0.16, 0.64 + cos(u_time * 0.44) * 0.09);
+  vec2 pPurple  = vec2(0.3 + cos(u_time * 0.26) * 0.16, 0.70 + sin(u_time * 0.34) * 0.09);
 
   // ===== Smoothstep color weights (additive blending in shader) =====
-  float wYellow = smoothstep(0.90, 0.0, distance(warpedUV, pYellow));
-  float wOrange = smoothstep(1.00, 0.1, distance(warpedUV, pOrange));
-  float wPink   = smoothstep(0.80, 0.0, distance(warpedUV, pPink));
-  float wPurple = smoothstep(0.90, 0.0, distance(warpedUV, pPurple));
+  float wYellow = 1.0 - smoothstep(0.0, 0.68, distance(warpedUV, pYellow));
+  float wOrange = 1.0 - smoothstep(0.0, 0.72, distance(warpedUV, pOrange));
+  float wPink   = 1.0 - smoothstep(0.0, 0.58, distance(warpedUV, pPink));
+  float wPurple = 1.0 - smoothstep(0.0, 0.64, distance(warpedUV, pPurple));
 
   vec3 color = colYellow * (wYellow * 1.2)
              + colOrange * (wOrange * 1.0)
@@ -113,8 +113,13 @@ void main() {
 
   // ===== Vertical breathing fade =====
   float breath = 0.5 + 0.5 * sin(u_time * 0.55);
-  float vFade = smoothstep(0.88 + breath * 0.06, 0.08, uv.y);
-  color *= vFade;
+  float lowerReveal = smoothstep(
+    0.16 + breath * 0.03,
+    0.62 + breath * 0.03,
+    uv.y
+  );
+  float bottomFade = 1.0 - smoothstep(0.96, 1.08, uv.y);
+  float vFade = lowerReveal * bottomFade;
 
   // ===== Background mix =====
   vec3 bg = mix(vec3(0.059), vec3(0.94, 0.95, 0.96), u_isLightMode);
@@ -122,7 +127,7 @@ void main() {
     color = color * 0.5 + 0.3;
     color = mix(bg, color, vFade * 0.6);
   } else {
-    color = mix(bg, color, 1.0);
+    color = mix(bg, color, vFade);
   }
 
   // ===== Film grain =====

@@ -207,14 +207,14 @@ class _FallbackPainter extends CustomPainter {
     ];
 
     final positions = [
-      Offset(0.2 + sin(time * 0.32) * 0.12, 0.4 + cos(time * 0.26) * 0.11),
-      Offset(0.8 + cos(time * 0.38) * 0.12, 0.4 + sin(time * 0.30) * 0.11),
-      Offset(0.7 + sin(time * 0.20) * 0.16, 0.2 + cos(time * 0.44) * 0.11),
-      Offset(0.3 + cos(time * 0.26) * 0.16, 0.1 + sin(time * 0.34) * 0.11),
+      Offset(0.2 + sin(time * 0.32) * 0.12, 0.78 + cos(time * 0.26) * 0.08),
+      Offset(0.8 + cos(time * 0.38) * 0.12, 0.86 + sin(time * 0.30) * 0.08),
+      Offset(0.7 + sin(time * 0.20) * 0.16, 0.64 + cos(time * 0.44) * 0.09),
+      Offset(0.3 + cos(time * 0.26) * 0.16, 0.70 + sin(time * 0.34) * 0.09),
     ];
 
     final alphas = [0.45, 0.38, 0.35, 0.40];
-    final radii = [0.55, 0.50, 0.48, 0.52];
+    final radii = [0.42, 0.40, 0.36, 0.40];
 
     for (int i = 0; i < 4; i++) {
       // Add noise-like distortion to position
@@ -241,20 +241,20 @@ class _FallbackPainter extends CustomPainter {
       canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
     }
 
-    // Vertical breathing fade
+    // Keep the top calm and reveal the moving color toward the lower screen.
     final breath = 0.5 + 0.5 * sin(time * 0.55);
     final fadePaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.transparent,
-          Colors.transparent,
-          const Color(0x9914121B),
-          const Color(0xE614121B),
           const Color(0xFF14121B),
+          const Color(0xF214121B),
+          const Color(0xB314121B),
+          const Color(0x4D14121B),
+          Colors.transparent,
         ],
-        stops: [0.0, 0.30 + breath * 0.05, 0.60, 0.85, 1.0],
+        stops: [0.0, 0.24 + breath * 0.03, 0.48, 0.70, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), fadePaint);
 

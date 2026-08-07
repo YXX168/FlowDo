@@ -535,7 +535,8 @@ class AnimatedFilterTab extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          constraints: const BoxConstraints(minHeight: 38),
+          padding: const EdgeInsets.symmetric(horizontal: 13),
           decoration: BoxDecoration(
             gradient: isActive
                 ? LinearGradient(
@@ -562,11 +563,13 @@ class AnimatedFilterTab extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
                 style: TextStyle(
                   fontSize: 13,
+                  height: 1,
                   fontWeight: FontWeight.w700,
                   color: isActive
                       ? AppTheme.textPrimary
@@ -582,7 +585,12 @@ class AnimatedFilterTab extends StatelessWidget {
                   return Transform.scale(scale: scale, child: child);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  constraints: const BoxConstraints(
+                    minWidth: 22,
+                    minHeight: 18,
+                  ),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
                     color: isActive
                         ? AppTheme.accent.withValues(alpha: 0.3)
@@ -593,6 +601,7 @@ class AnimatedFilterTab extends StatelessWidget {
                     '$count',
                     style: TextStyle(
                       fontSize: 10,
+                      height: 1,
                       fontWeight: FontWeight.w700,
                       color: isActive
                           ? AppTheme.textPrimary
