@@ -30,4 +30,17 @@ void main() {
     expect(result.map((item) => item.id), ['a', 'd', 'c', 'b']);
     expect(result.map((item) => item.order), [0, 1, 2, 3]);
   });
+
+  test('uses the adjusted forward index from ReorderableListView', () {
+    final all = [todo('a', 0), todo('b', 1), todo('c', 2), todo('d', 3)];
+
+    final result = reorderVisibleTodos(
+      allTodos: all,
+      visibleTodos: all,
+      oldIndex: 0,
+      newIndex: 3,
+    );
+
+    expect(result.map((item) => item.id), ['b', 'c', 'd', 'a']);
+  });
 }

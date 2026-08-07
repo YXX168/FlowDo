@@ -22,15 +22,13 @@ List<Todo> reorderVisibleTodos({
   if (oldIndex < 0 || oldIndex >= visibleTodos.length) {
     throw RangeError.index(oldIndex, visibleTodos, 'oldIndex');
   }
-  if (newIndex < 0 || newIndex > visibleTodos.length) {
-    throw RangeError.range(newIndex, 0, visibleTodos.length, 'newIndex');
+  if (newIndex < 0 || newIndex >= visibleTodos.length) {
+    throw RangeError.index(newIndex, visibleTodos, 'newIndex');
   }
 
   final reorderedVisible = List<Todo>.of(visibleTodos);
-  var insertionIndex = newIndex;
-  if (insertionIndex > oldIndex) insertionIndex--;
   final moved = reorderedVisible.removeAt(oldIndex);
-  reorderedVisible.insert(insertionIndex, moved);
+  reorderedVisible.insert(newIndex, moved);
 
   final visibleIds = visibleTodos.map((todo) => todo.id).toSet();
   var nextVisibleIndex = 0;

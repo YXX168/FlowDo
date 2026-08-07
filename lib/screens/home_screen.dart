@@ -743,7 +743,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
         itemCount: filtered.length,
         buildDefaultDragHandles: false,
-        onReorder: _reorderTodos,
+        onReorderItem: _reorderTodos,
         proxyDecorator: (child, index, animation) {
           return AnimatedBuilder(
             animation: animation,
