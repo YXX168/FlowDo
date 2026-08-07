@@ -15,21 +15,54 @@ class FluidBackground extends StatefulWidget {
 }
 
 class _FluidBackgroundState extends State<FluidBackground>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _controller;
   FragmentShader? _shader;
   bool _shaderLoaded = false;
+  bool _animationsDisabled = false;
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   Offset _mouse = const Offset(0.5, 0.5);
   Offset _targetMouse = const Offset(0.5, 0.5);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _lifecycleState =
+        WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 60),
-    )..repeat();
+    );
+    _syncAnimationState();
     _loadShader();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animationsDisabled =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (_animationsDisabled != animationsDisabled) {
+      _animationsDisabled = animationsDisabled;
+      _syncAnimationState();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycleState = state;
+    _syncAnimationState();
+  }
+
+  void _syncAnimationState() {
+    final shouldAnimate = !_animationsDisabled &&
+        _lifecycleState == AppLifecycleState.resumed;
+    if (shouldAnimate && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!shouldAnimate && _controller.isAnimating) {
+      _controller.stop();
+    }
   }
 
   Future<void> _loadShader() async {
@@ -54,20 +87,22 @@ class _FluidBackgroundState extends State<FluidBackground>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
-        return MouseRegion(
-          onHover: (event) => _updateMouse(event.position, size),
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final size = Size(constraints.maxWidth, constraints.maxHeight);
+          return MouseRegion(
+            onHover: (event) => _updateMouse(event.localPosition, size),
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
               // Smooth mouse interpolation
               _mouse = Offset(
                 _mouse.dx + (_targetMouse.dx - _mouse.dx) * 0.05,
@@ -90,10 +125,11 @@ class _FluidBackgroundState extends State<FluidBackground>
                 painter: _FallbackPainter(_controller.value),
                 size: size,
               );
-            },
-          ),
-        );
-      },
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -114,13 +150,11 @@ class _ShaderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size canvasSize) {
-    final dpr = PlatformDispatcher.instance.views.first.devicePixelRatio;
-    final pixelW = canvasSize.width * dpr;
-    final pixelH = canvasSize.height * dpr;
-
     shader.setFloat(0, time); // u_time
-    shader.setFloat(1, pixelW); // u_resolution.x
-    shader.setFloat(2, pixelH); // u_resolution.y
+    // FlutterFragCoord uses the CustomPaint local coordinate space, so these
+    // values must remain logical pixels. Multiplying by DPR distorts the UVs.
+    shader.setFloat(1, canvasSize.width); // u_resolution.x
+    shader.setFloat(2, canvasSize.height); // u_resolution.y
     shader.setFloat(3, mouse.dx); // u_mouse.x
     shader.setFloat(4, mouse.dy); // u_mouse.y
     shader.setFloat(5, 0.0); // u_isLightMode (dark mode)
@@ -130,7 +164,11 @@ class _ShaderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ShaderPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ShaderPainter oldDelegate) =>
+      oldDelegate.time != time ||
+      oldDelegate.size != size ||
+      oldDelegate.mouse != mouse ||
+      oldDelegate.shader != shader;
 }
 
 /// Fallback painter when GPU shader is unavailable.
@@ -237,5 +275,6 @@ class _FallbackPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _FallbackPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _FallbackPainter oldDelegate) =>
+      oldDelegate.t != t;
 }

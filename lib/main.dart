@@ -28,10 +28,14 @@ class FlowDoApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppTheme.bgPrimary,
-        fontFamily: 'PingFang SC',
         colorScheme: const ColorScheme.dark(
           primary: AppTheme.accent,
           surface: AppTheme.bgPrimary,
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xF22D293A),
+          contentTextStyle: TextStyle(color: AppTheme.textPrimary),
         ),
       ),
       home: const HomeScreen(),

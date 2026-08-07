@@ -9,13 +9,19 @@ Fluid Todo App for Android (ARM64) built with Flutter.
 - Priority-based todo management (High / Medium / Low)
 - Filter tabs (All / Active / Completed)
 - Statistics with progress bar
-- Local JSON file storage
+- Search, editing, swipe-to-delete, undo, and filtered drag-to-reorder
+- Validated local JSON storage with serialized atomic writes and recovery backup
 
 ## Build
 
-This project uses GitHub Actions for cloud compilation. Push to `main` branch to trigger the build automatically.
+This project uses GitHub Actions for all validation and cloud compilation. A
+push to `main` runs static analysis, unit tests, shader
+compilation, and the ARM64 release build.
 
-The APK artifact will be available in the Actions tab.
+The APK artifact will be available in the Actions tab as `flowdo-arm64-apk`.
+
+The Android runner structure is generated in CI, so no local Flutter toolchain
+is required to produce a release artifact.
 
 ## Tech Stack
 

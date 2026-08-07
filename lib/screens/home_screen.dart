@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../models/todo.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/todo_ordering.dart';
 import '../widgets/fluid_background.dart';
 import '../widgets/animated_widgets.dart';
 
@@ -23,13 +24,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Todo> _todos = [];
   String _currentFilter = 'all';
-  String _selectedPriority = 'medium';
-  String _selectedCategory = 'other';
+  String _selectedPriority = TodoPriority.medium;
+  String _selectedCategory = TodoCategory.other;
   String? _editingId;
   String _searchQuery = '';
   bool _isSearchVisible = false;
-  Timer? _saveTimer;
   bool _isLoading = true;
+  int _pendingSaves = 0;
+  String? _storageError;
 
   @override
   void initState() {
@@ -47,61 +49,124 @@ class _HomeScreenState extends State<HomeScreen> {
     _inputController.dispose();
     _editController.dispose();
     _searchController.dispose();
-    _saveTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _loadTodos() async {
-    final todos = await _storage.loadTodos();
-    setState(() {
-      _todos = todos;
-      _isLoading = false;
-    });
+    try {
+      final todos = await _storage.loadTodos();
+      if (!mounted) return;
+      setState(() {
+        _todos = todos;
+        _isLoading = false;
+      });
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _storageError = error.message;
+        _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showMessage(error.message);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      const message = '无法初始化本地存储，请重新打开应用。';
+      setState(() {
+        _storageError = message;
+        _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showMessage(message);
+      });
+    }
   }
 
-  void _saveTodos() {
-    _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 300), () {
-      _storage.saveTodos(_todos);
-    });
+  Future<void> _saveTodos() async {
+    final snapshot = List<Todo>.unmodifiable(_todos);
+    setState(() => _pendingSaves++);
+    try {
+      await _storage.saveTodos(snapshot);
+      if (mounted && _storageError != null) {
+        setState(() => _storageError = null);
+      }
+    } on StorageException catch (error) {
+      if (!mounted) return;
+      setState(() => _storageError = error.message);
+      _showMessage(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      const message = '保存失败，请稍后重试。';
+      setState(() => _storageError = message);
+      _showMessage(message);
+    } finally {
+      if (mounted) setState(() => _pendingSaves--);
+    }
   }
 
   void _addTodo() {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
     HapticFeedback.mediumImpact();
+    final now = DateTime.now();
     setState(() {
-      _todos.insert(0, Todo(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: text,
-        priority: _selectedPriority,
-        category: _selectedCategory,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        order: _todos.isEmpty ? 0 : _todos.first.order - 1,
-      ));
+      _todos = normalizeTodoOrder([
+        Todo(
+          id: now.microsecondsSinceEpoch.toString(),
+          text: text,
+          priority: _selectedPriority,
+          category: _selectedCategory,
+          createdAt: now.millisecondsSinceEpoch,
+        ),
+        ..._todos,
+      ]);
       _inputController.clear();
-      _selectedPriority = 'medium';
-      _selectedCategory = 'other';
+      _selectedPriority = TodoPriority.medium;
+      _selectedCategory = TodoCategory.other;
     });
-    _saveTodos();
+    unawaited(_saveTodos());
   }
 
   void _toggleTodo(String id) {
+    final index = _todos.indexWhere((todo) => todo.id == id);
+    if (index < 0) return;
     setState(() {
-      final todo = _todos.firstWhere((t) => t.id == id);
-      todo.completed = !todo.completed;
+      final todo = _todos[index];
+      _todos[index] = todo.copyWith(completed: !todo.completed);
     });
-    _saveTodos();
+    unawaited(_saveTodos());
   }
 
   void _deleteTodo(String id) {
+    final index = _todos.indexWhere((todo) => todo.id == id);
+    if (index < 0) return;
+    final removed = _todos[index];
     HapticFeedback.heavyImpact();
-    setState(() => _todos.removeWhere((t) => t.id == id));
-    _saveTodos();
+    setState(() {
+      _todos = normalizeTodoOrder(
+        _todos.where((todo) => todo.id != id),
+      );
+    });
+    unawaited(_saveTodos());
+    _showMessage(
+      '已删除“${removed.text}”',
+      action: SnackBarAction(
+        label: '撤销',
+        onPressed: () {
+          final restored = List<Todo>.of(_todos);
+          final insertAt = index > restored.length ? restored.length : index;
+          restored.insert(insertAt, removed);
+          setState(() => _todos = normalizeTodoOrder(restored));
+          unawaited(_saveTodos());
+        },
+      ),
+    );
   }
 
   void _startEdit(String id) {
-    final todo = _todos.firstWhere((t) => t.id == id);
+    final index = _todos.indexWhere((todo) => todo.id == id);
+    if (index < 0) return;
+    final todo = _todos[index];
     _editController.text = todo.text;
     setState(() => _editingId = id);
   }
@@ -110,13 +175,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_editingId == null) return;
     final text = _editController.text.trim();
     if (text.isEmpty) return;
+    final index = _todos.indexWhere((todo) => todo.id == _editingId);
+    if (index < 0) {
+      _cancelEdit();
+      return;
+    }
     setState(() {
-      final todo = _todos.firstWhere((t) => t.id == _editingId);
-      todo.text = text;
+      _todos[index] = _todos[index].copyWith(text: text);
       _editingId = null;
     });
     _editController.clear();
-    _saveTodos();
+    unawaited(_saveTodos());
   }
 
   void _cancelEdit() {
@@ -125,22 +194,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _clearCompleted() {
+    final previousTodos = List<Todo>.of(_todos);
+    final count = _doneCount;
+    if (count == 0) return;
     HapticFeedback.mediumImpact();
-    setState(() => _todos.removeWhere((t) => t.completed));
-    _saveTodos();
+    setState(() {
+      _todos = normalizeTodoOrder(
+        _todos.where((todo) => !todo.completed),
+      );
+    });
+    unawaited(_saveTodos());
+    _showMessage(
+      '已清除 $count 个已完成事项',
+      action: SnackBarAction(
+        label: '撤销',
+        onPressed: () {
+          setState(() => _todos = previousTodos);
+          unawaited(_saveTodos());
+        },
+      ),
+    );
   }
 
   void _reorderTodos(int oldIndex, int newIndex) {
     HapticFeedback.selectionClick();
     setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final todo = _todos.removeAt(oldIndex);
-      _todos.insert(newIndex, todo);
-      for (int i = 0; i < _todos.length; i++) {
-        _todos[i].order = i;
-      }
+      _todos = reorderVisibleTodos(
+        allTodos: _todos,
+        visibleTodos: _filteredTodos,
+        oldIndex: oldIndex,
+        newIndex: newIndex,
+      );
     });
-    _saveTodos();
+    unawaited(_saveTodos());
   }
 
   List<Todo> get _filteredTodos {
@@ -148,9 +234,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Search filter
     if (_searchQuery.isNotEmpty) {
-      result = result.where((t) =>
-        t.text.toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
+      final normalizedQuery = _searchQuery.trim().toLowerCase();
+      result = result
+          .where((todo) => todo.text.toLowerCase().contains(normalizedQuery))
+          .toList();
     }
 
     // Status filter
@@ -160,15 +247,22 @@ class _HomeScreenState extends State<HomeScreen> {
       result = result.where((t) => t.completed).toList();
     }
 
-    // Sort: incomplete first, then by priority, then by order
-    result.sort((a, b) {
-      if (a.completed != b.completed) return a.completed ? 1 : -1;
-      final order = {'high': 0, 'medium': 1, 'low': 2};
-      final cmp = (order[a.priority] ?? 1).compareTo(order[b.priority] ?? 1);
-      if (cmp != 0) return cmp;
-      return a.order.compareTo(b.order);
-    });
+    result.sort((a, b) => a.order.compareTo(b.order));
     return result;
+  }
+
+  void _showMessage(String message, {SnackBarAction? action}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: action,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   int get _total => _todos.length;
@@ -249,10 +343,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final showDate = constraints.maxWidth >= 310;
+              return Row(
                 children: [
                   _buildLogo(),
                   const SizedBox(width: 12),
@@ -266,16 +360,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     baseColor: AppTheme.textPrimary,
                     highlightColor: AppTheme.accent.withValues(alpha: 0.8),
                   ),
-                ],
-              ),
-              Row(
-                children: [
+                  const Spacer(),
+                  _buildStorageStatus(),
                   _buildSearchToggle(),
-                  const SizedBox(width: 8),
-                  _buildDateBadge(),
+                  if (showDate) ...[
+                    const SizedBox(width: 8),
+                    _buildDateBadge(),
+                  ],
                 ],
-              ),
-            ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           Row(
@@ -292,6 +386,35 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildStorageStatus() {
+    if (_storageError != null) {
+      return IconButton(
+        onPressed: () => _showMessage(_storageError!),
+        tooltip: '保存异常',
+        visualDensity: VisualDensity.compact,
+        icon: const Icon(
+          Icons.cloud_off_rounded,
+          size: 16,
+          color: AppTheme.priorityHigh,
+        ),
+      );
+    }
+    if (_pendingSaves > 0) {
+      return const SizedBox(
+        width: 32,
+        height: 32,
+        child: Padding(
+          padding: EdgeInsets.all(9),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppTheme.textQuaternary,
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildLogo() {
@@ -330,7 +453,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchToggle() {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: _isSearchVisible ? '关闭搜索' : '搜索待办事项',
+      child: GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         setState(() {
@@ -360,6 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
           size: 16,
           color: _isSearchVisible ? AppTheme.accent : AppTheme.textSecondary,
         ),
+      ),
       ),
     );
   }
@@ -427,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
       curve: Curves.easeOutCubic,
       child: _isSearchVisible
           ? Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+              padding: const EdgeInsets.only(top: 8),
               child: Container(
                 height: 40,
                 decoration: BoxDecoration(
@@ -512,7 +639,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: ['work', 'personal', 'shopping', 'other'].map((cat) {
+                    children: TodoCategory.values.map((cat) {
                       return Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: AnimatedCategoryChip(
@@ -539,53 +666,50 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0x0AFFFFFF),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            ),
-            child: Row(
-              children: [
-                AnimatedFilterTab(
-                  label: '全部',
-                  count: _total,
-                  isActive: _currentFilter == 'all',
-                  onTap: () => setState(() => _currentFilter = 'all'),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0x0AFFFFFF),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                 ),
-                AnimatedFilterTab(
-                  label: '进行中',
-                  count: _activeCount,
-                  isActive: _currentFilter == 'active',
-                  onTap: () => setState(() => _currentFilter = 'active'),
+                child: Row(
+                  children: [
+                    AnimatedFilterTab(
+                      label: '全部',
+                      count: _total,
+                      isActive: _currentFilter == 'all',
+                      onTap: () => setState(() => _currentFilter = 'all'),
+                    ),
+                    AnimatedFilterTab(
+                      label: '进行中',
+                      count: _activeCount,
+                      isActive: _currentFilter == 'active',
+                      onTap: () => setState(() => _currentFilter = 'active'),
+                    ),
+                    AnimatedFilterTab(
+                      label: '已完成',
+                      count: _doneCount,
+                      isActive: _currentFilter == 'completed',
+                      onTap: () => setState(() => _currentFilter = 'completed'),
+                    ),
+                  ],
                 ),
-                AnimatedFilterTab(
-                  label: '已完成',
-                  count: _doneCount,
-                  isActive: _currentFilter == 'completed',
-                  onTap: () => setState(() => _currentFilter = 'completed'),
-                ),
-              ],
+              ),
             ),
           ),
           if (_doneCount > 0)
-            GestureDetector(
-              onTap: _clearCompleted,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  '清除已完成',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textQuaternary,
-                  ),
-                ),
+            IconButton(
+              onPressed: _clearCompleted,
+              tooltip: '清除已完成',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(
+                Icons.delete_sweep_outlined,
+                size: 20,
+                color: AppTheme.textQuaternary,
               ),
             ),
         ],
@@ -656,7 +780,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Icon(Icons.delete_outline, color: AppTheme.priorityHigh, size: 24),
               ),
               confirmDismiss: (direction) async {
-                HapticFeedback.heavyImpact();
                 return true;
               },
               onDismissed: (direction) => _deleteTodo(todo.id),
@@ -722,7 +845,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               // Drag handle
-              if (index < total)
+              if (total > 1)
                 ReorderableDragStartListener(
                   index: index,
                   child: Padding(
@@ -735,12 +858,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.only(top: 12, right: 8),
-                child: GestureDetector(
-                  onTap: () => _startEdit(todo.id),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.edit_outlined, size: 16, color: AppTheme.textSecondary),
+                padding: const EdgeInsets.only(top: 2, right: 2),
+                child: IconButton(
+                  onPressed: () => _startEdit(todo.id),
+                  tooltip: '编辑',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: AppTheme.textSecondary,
                   ),
                 ),
               ),

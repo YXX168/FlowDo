@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/todo.dart';
 import '../theme/app_theme.dart';
 
 // ============================================================
@@ -69,15 +70,20 @@ class _AnimatedPrioritySelectorState extends State<AnimatedPrioritySelector>
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: ['high', 'medium', 'low'].map((p) {
+      children: TodoPriority.values.map((p) {
         final color = AppTheme.priorityColor(p);
         final isActive = widget.selected == p;
-        return GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            widget.onChanged(p);
-          },
-          child: AnimatedBuilder(
+        return Semantics(
+          button: true,
+          selected: isActive,
+          label: '${AppTheme.priorityLabel(p)}优先级',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              widget.onChanged(p);
+            },
+            child: AnimatedBuilder(
             animation: Listenable.merge([_scaleAnim, _glowAnim]),
             builder: (context, child) {
               final scale = isActive ? 1.0 + _scaleAnim.value * 0.35 : 1.0;
@@ -85,11 +91,12 @@ class _AnimatedPrioritySelectorState extends State<AnimatedPrioritySelector>
               return Transform.scale(
                 scale: scale,
                 child: Container(
-                  margin: const EdgeInsets.only(left: 8),
-                  width: 20,
-                  height: 20,
+                  margin: const EdgeInsets.only(left: 2),
+                  width: 36,
+                  height: 44,
                   child: Stack(
                     alignment: Alignment.center,
+                    clipBehavior: Clip.none,
                     children: [
                       // Glow ring
                       if (isActive)
@@ -140,6 +147,7 @@ class _AnimatedPrioritySelectorState extends State<AnimatedPrioritySelector>
                 ),
               );
             },
+            ),
           ),
         );
       }).toList(),
@@ -165,12 +173,16 @@ class AnimatedCategoryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = AppTheme.categoryColor(category);
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      child: AnimatedContainer(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '${AppTheme.categoryLabel(category)}分类',
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -210,6 +222,7 @@ class AnimatedCategoryChip extends StatelessWidget {
               child: Text(AppTheme.categoryLabel(category)),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -283,12 +296,21 @@ class _AnimatedTodoCheckboxState extends State<AnimatedTodoCheckbox>
   @override
   Widget build(BuildContext context) {
     final activeColor = widget.activeColor ?? AppTheme.priorityLow;
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        widget.onChanged(!widget.checked);
-      },
-      child: AnimatedBuilder(
+    return Semantics(
+      button: true,
+      checked: widget.checked,
+      label: widget.checked ? '标记为未完成' : '标记为已完成',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onChanged(!widget.checked);
+        },
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
           return Transform.scale(
@@ -323,6 +345,9 @@ class _AnimatedTodoCheckboxState extends State<AnimatedTodoCheckbox>
             ),
           );
         },
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -412,15 +437,21 @@ class _GlassSubmitButtonState extends State<GlassSubmitButton>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _pressCtrl.forward(),
-      onTapUp: (_) {
-        _pressCtrl.reverse();
-        HapticFeedback.mediumImpact();
-        widget.onPressed();
-      },
-      onTapCancel: () => _pressCtrl.reverse(),
-      child: AnimatedBuilder(
+    return Semantics(
+      button: true,
+      enabled: !widget.isLoading,
+      label: '添加待办事项',
+      child: GestureDetector(
+        onTapDown: widget.isLoading ? null : (_) => _pressCtrl.forward(),
+        onTapUp: widget.isLoading
+            ? null
+            : (_) {
+                _pressCtrl.reverse();
+                HapticFeedback.mediumImpact();
+                widget.onPressed();
+              },
+        onTapCancel: () => _pressCtrl.reverse(),
+        child: AnimatedBuilder(
         animation: Listenable.merge([_scaleAnim, _glowAnim]),
         builder: (context, child) {
           return Transform.scale(
@@ -463,6 +494,7 @@ class _GlassSubmitButtonState extends State<GlassSubmitButton>
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -487,12 +519,16 @@ class AnimatedFilterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      child: AnimatedScale(
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: '$label，$count 项',
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: AnimatedScale(
         scale: isActive ? 1.05 : 1.0,
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
@@ -567,6 +603,7 @@ class AnimatedFilterTab extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
