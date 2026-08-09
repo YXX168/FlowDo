@@ -529,198 +529,94 @@ class AnimatedFilterTab extends StatelessWidget {
           onTap();
         },
         child: AnimatedScale(
-        scale: isActive ? 1.05 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
+          scale: isActive ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minHeight: 38),
-          padding: const EdgeInsets.symmetric(horizontal: 13),
-          decoration: BoxDecoration(
-            gradient: isActive
-                ? LinearGradient(
-                    colors: [
-                      AppTheme.accent.withValues(alpha: 0.25),
-                      AppTheme.accentHover.withValues(alpha: 0.15),
-                    ],
-                  )
-                : null,
-            color: isActive ? null : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: isActive
-                ? Border.all(color: AppTheme.accent.withValues(alpha: 0.4), width: 1)
-                : Border.all(color: Colors.transparent, width: 1),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppTheme.accent.withValues(alpha: 0.2),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1,
-                  fontWeight: FontWeight.w700,
-                  color: isActive
-                      ? AppTheme.textPrimary
-                      : AppTheme.textSecondary,
-                ),
-                child: Text(label),
-              ),
-              const SizedBox(width: 5),
-              TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0.7, end: 1.0),
-                duration: const Duration(milliseconds: 200),
-                builder: (context, scale, child) {
-                  return Transform.scale(scale: scale, child: child);
-                },
-                child: Container(
-                  constraints: const BoxConstraints(
-                    minWidth: 22,
-                    minHeight: 18,
-                  ),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  decoration: BoxDecoration(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 38),
+            padding: const EdgeInsets.symmetric(horizontal: 13),
+            decoration: BoxDecoration(
+              gradient: isActive
+                  ? LinearGradient(
+                      colors: [
+                        AppTheme.accent.withValues(alpha: 0.25),
+                        AppTheme.accentHover.withValues(alpha: 0.15),
+                      ],
+                    )
+                  : null,
+              color: isActive ? null : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: isActive
+                  ? Border.all(
+                      color: AppTheme.accent.withValues(alpha: 0.4),
+                    )
+                  : Border.all(color: Colors.transparent),
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.accent.withValues(alpha: 0.2),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
                     color: isActive
-                        ? AppTheme.accent.withValues(alpha: 0.3)
-                        : const Color(0x14FFFFFF),
-                    borderRadius: BorderRadius.circular(6),
+                        ? AppTheme.textPrimary
+                        : AppTheme.textSecondary,
                   ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 10,
-                      height: 1,
-                      fontWeight: FontWeight.w700,
+                  child: Text(label),
+                ),
+                const SizedBox(width: 5),
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.7, end: 1.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, scale, child) {
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 22,
+                      minHeight: 18,
+                    ),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    decoration: BoxDecoration(
                       color: isActive
-                          ? AppTheme.textPrimary
-                          : AppTheme.textQuaternary,
+                          ? AppTheme.accent.withValues(alpha: 0.3)
+                          : const Color(0x14FFFFFF),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 10,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
+                        color: isActive
+                            ? AppTheme.textPrimary
+                            : AppTheme.textQuaternary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        ),
       ),
-    );
-  }
-}
-
-// ============================================================
-// Staggered List Item Animation
-// ============================================================
-class StaggeredListItem extends StatefulWidget {
-  final int index;
-  final Widget child;
-
-  const StaggeredListItem({
-    super.key,
-    required this.index,
-    required this.child,
-  });
-
-  @override
-  State<StaggeredListItem> createState() => _StaggeredListItemState();
-}
-
-class _StaggeredListItemState extends State<StaggeredListItem>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _opacity;
-  late Animation<Offset> _slideOffset;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-
-    final delay = (widget.index * 0.08).clamp(0.0, 0.4);
-    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Interval(delay, 1.0, curve: Curves.easeOut),
-      ),
-    );
-    _slideOffset = Tween<Offset>(
-      begin: const Offset(-0.3, 0.1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _opacity.value,
-          child: FractionalTranslation(
-            translation: _slideOffset.value,
-            child: child,
-          ),
-        );
-      },
-      child: widget.child,
-    );
-  }
-}
-
-// ============================================================
-// Animated Counter (number rolling)
-// ============================================================
-class AnimatedCounter extends StatelessWidget {
-  final int value;
-  final TextStyle? style;
-
-  const AnimatedCounter({
-    super.key,
-    required this.value,
-    this.style,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<int>(
-      tween: IntTween(begin: 0, end: value),
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeOutCubic,
-      builder: (context, val, _) {
-        return Text(
-          '$val',
-          style: (style ?? const TextStyle()).copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        );
-      },
     );
   }
 }

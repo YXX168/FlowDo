@@ -1,6 +1,6 @@
 flutter_launcher_icons:
   android: launcher_icon
-  image_path: assets/icon/flowdo-icon-foreground.png
+  image_path: assets/icon/flowdo-icon-foreground-v2.png
   adaptive_icon_background: "#14121B"
-  adaptive_icon_foreground: assets/icon/flowdo-icon-foreground.png
+  adaptive_icon_foreground: assets/icon/flowdo-icon-foreground-v2.png
   min_sdk_android: 23

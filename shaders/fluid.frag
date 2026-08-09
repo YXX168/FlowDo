@@ -88,42 +88,43 @@ void main() {
   float n2 = snoise(st * 2.5 + u_time * 0.25 + n1 * 0.5);
   warpedUV += vec2(n2 * 0.06);
 
-  // ===== Color palette (exact match from original) =====
-  vec3 colOrange = vec3(0.68, 0.25, 0.06);
-  vec3 colYellow = vec3(0.68, 0.52, 0.12);
-  vec3 colPurple = vec3(0.28, 0.07, 0.52);
-  vec3 colPink = vec3(0.66, 0.10, 0.34);
+  // ===== Muted liquid palette =====
+  // Keep the liquid present without competing with foreground text.
+  vec3 colOrange = vec3(0.38, 0.13, 0.05);
+  vec3 colYellow = vec3(0.34, 0.24, 0.08);
+  vec3 colPurple = vec3(0.19, 0.05, 0.38);
+  vec3 colPink = vec3(0.42, 0.07, 0.24);
 
   // ===== Blob positions with organic movement =====
-  vec2 pYellow  = vec2(0.2 + sin(u_time * 0.32) * 0.12, 0.78 + cos(u_time * 0.26) * 0.08);
-  vec2 pOrange  = vec2(0.8 + cos(u_time * 0.38) * 0.12, 0.86 + sin(u_time * 0.30) * 0.08);
-  vec2 pPink    = vec2(0.7 + sin(u_time * 0.20) * 0.16, 0.64 + cos(u_time * 0.44) * 0.09);
-  vec2 pPurple  = vec2(0.3 + cos(u_time * 0.26) * 0.16, 0.70 + sin(u_time * 0.34) * 0.09);
+  vec2 pYellow  = vec2(0.18 + sin(u_time * 0.24) * 0.10, 0.92 + cos(u_time * 0.20) * 0.05);
+  vec2 pOrange  = vec2(0.84 + cos(u_time * 0.28) * 0.10, 0.98 + sin(u_time * 0.22) * 0.04);
+  vec2 pPink    = vec2(0.72 + sin(u_time * 0.17) * 0.13, 0.84 + cos(u_time * 0.30) * 0.06);
+  vec2 pPurple  = vec2(0.28 + cos(u_time * 0.20) * 0.13, 0.88 + sin(u_time * 0.25) * 0.06);
 
   // ===== Smoothstep color weights (additive blending in shader) =====
-  float wYellow = 1.0 - smoothstep(0.0, 0.68, distance(warpedUV, pYellow));
-  float wOrange = 1.0 - smoothstep(0.0, 0.72, distance(warpedUV, pOrange));
-  float wPink   = 1.0 - smoothstep(0.0, 0.58, distance(warpedUV, pPink));
-  float wPurple = 1.0 - smoothstep(0.0, 0.64, distance(warpedUV, pPurple));
+  float wYellow = 1.0 - smoothstep(0.0, 0.52, distance(warpedUV, pYellow));
+  float wOrange = 1.0 - smoothstep(0.0, 0.56, distance(warpedUV, pOrange));
+  float wPink   = 1.0 - smoothstep(0.0, 0.46, distance(warpedUV, pPink));
+  float wPurple = 1.0 - smoothstep(0.0, 0.50, distance(warpedUV, pPurple));
 
-  vec3 color = colYellow * (wYellow * 0.72)
-             + colOrange * (wOrange * 0.70)
-             + colPink * (wPink * 0.68)
-             + colPurple * (wPurple * 0.82);
-  color = color / (vec3(1.0) + color * 0.45);
+  vec3 color = colYellow * (wYellow * 0.52)
+             + colOrange * (wOrange * 0.50)
+             + colPink * (wPink * 0.54)
+             + colPurple * (wPurple * 0.62);
+  color = color / (vec3(1.0) + color * 0.62);
 
   // ===== Vertical breathing fade =====
   float breath = 0.5 + 0.5 * sin(u_time * 0.55);
   float lowerReveal = smoothstep(
-    0.16 + breath * 0.03,
-    0.62 + breath * 0.03,
+    0.46 + breath * 0.02,
+    0.76 + breath * 0.02,
     uv.y
   );
-  float bottomFade = 1.0 - smoothstep(0.96, 1.08, uv.y);
+  float bottomFade = 1.0 - smoothstep(1.02, 1.16, uv.y);
   float vFade = lowerReveal * bottomFade;
 
   // ===== Background mix =====
-  vec3 bg = mix(vec3(0.059), vec3(0.94, 0.95, 0.96), u_isLightMode);
+  vec3 bg = mix(vec3(0.078, 0.071, 0.106), vec3(0.94, 0.95, 0.96), u_isLightMode);
   if (u_isLightMode > 0.5) {
     color = color * 0.5 + 0.3;
     color = mix(bg, color, vFade * 0.6);

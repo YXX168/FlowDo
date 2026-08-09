@@ -304,10 +304,12 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildHeader(),
           const SizedBox(height: 12),
+          _buildProgressOverview(),
+          const SizedBox(height: 12),
           _buildAddSection(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _buildFilterSection(),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Expanded(child: _buildTodoList()),
         ],
       ),
@@ -316,79 +318,136 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ==================== Header ====================
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-      decoration: BoxDecoration(
-        color: const Color(0xD91A1724),
-        border: Border.all(color: const Color(0x1AFFFFFF)),
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 24,
-            offset: Offset(0, 8),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showDate = constraints.maxWidth >= 330;
+          return Row(
+            children: [
+              _buildLogo(),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'FlowDo',
+                      style: TextStyle(
+                        fontSize: 22,
+                        height: 1.05,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      '把今天理顺',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.2,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _buildStorageStatus(),
+              if (showDate) ...[
+                _buildDateBadge(),
+                const SizedBox(width: 8),
+              ],
+              _buildSearchToggle(),
+            ],
+          );
+        },
       ),
-      child: Column(
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final showDate = constraints.maxWidth >= 310;
-              return Row(
+    );
+  }
+
+  Widget _buildProgressOverview() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xB31A1724),
+        border: Border.all(color: const Color(0x12FFFFFF)),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final useTwoRows = constraints.maxWidth < 320;
+          final progressCount = Text(
+            '$_doneCount / $_total',
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.2,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          );
+          final stats = <Widget>[
+            _buildCompactStat('待完成', _activeCount, AppTheme.statActive),
+            const SizedBox(width: 14),
+            _buildCompactStat('已完成', _doneCount, AppTheme.statDone),
+          ];
+
+          return Column(
+            children: [
+              Row(
                 children: [
-                  _buildLogo(),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'FlowDo',
-                        style: TextStyle(
-                          fontSize: 21,
-                          height: 1,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 5),
-                      Text(
-                        '把今天理顺',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.textTertiary,
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    '今日进度',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                   const Spacer(),
-                  _buildStorageStatus(),
-                  _buildSearchToggle(),
-                  if (showDate) ...[
-                    const SizedBox(width: 8),
-                    _buildDateBadge(),
-                  ],
+                  if (!useTwoRows) ...stats,
+                  if (!useTwoRows) const SizedBox(width: 14),
+                  progressCount,
                 ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatItem('进行中', _activeCount, AppTheme.statActive),
-              _buildDivider(),
-              _buildStatItem('已完成', _doneCount, AppTheme.statDone),
-              _buildDivider(),
-              _buildStatItem('总计', _total, AppTheme.statTotal),
+              ),
+              if (useTwoRows) ...[
+                const SizedBox(height: 8),
+                Row(children: stats),
+              ],
+              const SizedBox(height: 10),
+              AnimatedProgressBar(progress: _progress),
             ],
-          ),
-          const SizedBox(height: 10),
-          AnimatedProgressBar(progress: _progress),
-        ],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildCompactStat(String label, int value, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          '$label $value',
+          style: const TextStyle(
+            fontSize: 11,
+            height: 1.2,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textSecondary,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 
@@ -447,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(4),
           child: Image.asset(
-            'assets/icon/flowdo-icon-foreground.png',
+            'assets/icon/flowdo-icon-foreground-v2.png',
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
           ),
@@ -509,84 +568,45 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDivider() {
-    return Container(
-      width: 1,
-      height: 28,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: const Color(0x0FFFFFFF),
-    );
-  }
-
-  Widget _buildStatItem(String label, int value, Color color) {
-    return Expanded(
-      child: Column(
-        children: [
-          AnimatedCounter(
-            value: value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ==================== Search Bar ====================
   Widget _buildSearchBar() {
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       child: _isSearchVisible
-          ? Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0x0DFFFFFF),
-                  border: Border.all(color: const Color(0x14FFFFFF)),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          ? Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0x0DFFFFFF),
+                border: Border.all(color: const Color(0x14FFFFFF)),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              ),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textPrimary,
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  textAlignVertical: TextAlignVertical.center,
-                  style: const TextStyle(
+                decoration: const InputDecoration(
+                  hintText: '搜索待办事项...',
+                  hintStyle: TextStyle(
+                    color: AppTheme.textQuaternary,
                     fontSize: 14,
-                    color: AppTheme.textPrimary,
                   ),
-                  decoration: const InputDecoration(
-                    hintText: '搜索待办事项...',
-                    hintStyle: TextStyle(
-                      color: AppTheme.textQuaternary,
-                      fontSize: 14,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.only(right: 14),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      size: 18,
-                      color: AppTheme.textQuaternary,
-                    ),
-                    prefixIconConstraints: BoxConstraints(
-                      minWidth: 42,
-                      minHeight: 44,
-                    ),
-                    isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.only(right: 14),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    size: 18,
+                    color: AppTheme.textQuaternary,
                   ),
+                  prefixIconConstraints: BoxConstraints(
+                    minWidth: 42,
+                    minHeight: 44,
+                  ),
+                  isDense: true,
                 ),
               ),
             )
@@ -597,18 +617,35 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== Add Section ====================
   Widget _buildAddSection() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
-        color: const Color(0xB31A1724),
-        border: Border.all(color: const Color(0x14FFFFFF)),
+        color: const Color(0xCC181520),
+        border: Border.all(color: const Color(0x18FFFFFF)),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x24000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search bar (conditionally visible)
           _buildSearchBar(),
-          if (_isSearchVisible) const SizedBox(height: 8),
-          // Input row
+          if (_isSearchVisible) const SizedBox(height: 10),
+          const Text(
+            '添加待办',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.2,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 8),
           Container(
             height: 52,
             decoration: BoxDecoration(
@@ -627,10 +664,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: AppTheme.textPrimary,
                     ),
                     decoration: const InputDecoration(
-                      hintText: '输入待办事项...',
+                      hintText: '写下一件要完成的事',
                       hintStyle: TextStyle(color: AppTheme.textQuaternary),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 16,
+                      ),
                     ),
                     onSubmitted: (_) => _addTodo(),
                   ),
@@ -746,60 +787,52 @@ class _HomeScreenState extends State<HomeScreen> {
       return Center(child: _buildEmptyState());
     }
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      child: ReorderableListView.builder(
-        key: ValueKey('${_currentFilter}_$_searchQuery'),
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
-        itemCount: filtered.length,
-        buildDefaultDragHandles: false,
-        onReorderItem: _reorderTodos,
-        proxyDecorator: (child, index, animation) {
-          return AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              final scale = 1.0 + (animation.value - 1.0).abs() * 0.05;
-              return Transform.scale(
-                scale: scale,
-                child: Material(
-                  color: Colors.transparent,
-                  elevation: 8 * animation.value,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  child: child,
-                ),
-              );
-            },
-          );
-        },
-        itemBuilder: (context, index) {
-          final todo = filtered[index];
-          return StaggeredListItem(
-            key: ValueKey(todo.id),
-            index: index,
-            child: Dismissible(
-              key: ValueKey('dismiss_${todo.id}'),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.priorityHigh.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                ),
-                child: const Icon(Icons.delete_outline, color: AppTheme.priorityHigh, size: 24),
+    return ReorderableListView.builder(
+      key: ValueKey('${_currentFilter}_$_searchQuery'),
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+      itemCount: filtered.length,
+      buildDefaultDragHandles: false,
+      onReorderItem: _reorderTodos,
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            final scale = 1.0 + animation.value * 0.025;
+            return Transform.scale(
+              scale: scale,
+              child: Material(
+                color: Colors.transparent,
+                elevation: 6 * animation.value,
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                child: child,
               ),
-              confirmDismiss: (direction) async {
-                return true;
-              },
-              onDismissed: (direction) => _deleteTodo(todo.id),
-              child: _buildTodoItem(todo, index, filtered.length),
+            );
+          },
+        );
+      },
+      itemBuilder: (context, index) {
+        final todo = filtered[index];
+        return Dismissible(
+          key: ValueKey(todo.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.priorityHigh.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
-          );
-        },
-      ),
+            child: const Icon(
+              Icons.delete_outline,
+              color: AppTheme.priorityHigh,
+              size: 24,
+            ),
+          ),
+          onDismissed: (_) => _deleteTodo(todo.id),
+          child: _buildTodoItem(todo, index, filtered.length),
+        );
+      },
     );
   }
 
@@ -812,8 +845,8 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: todo.completed
-            ? const Color(0xA614121B)
-            : const Color(0xD91A1724),
+            ? const Color(0xB814121B)
+            : const Color(0xE61A1724),
         border: Border.all(
           color: todo.completed
               ? const Color(0x0FFFFFFF)
@@ -821,51 +854,46 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Priority bar with glow
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 4,
-              decoration: BoxDecoration(
-                color: priorityColor.withValues(alpha: todo.completed ? 0.3 : 1.0),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(AppTheme.radiusMd),
-                  bottomLeft: Radius.circular(AppTheme.radiusMd),
-                ),
-                boxShadow: todo.completed ? [] : [
-                  BoxShadow(
-                    color: priorityColor.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                  ),
-                ],
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            width: 4,
+            height: 64,
+            decoration: BoxDecoration(
+              color: priorityColor.withValues(
+                alpha: todo.completed ? 0.28 : 0.9,
               ),
             ),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-                child: _buildTodoContent(todo, isEditing, priorityColor, catColor),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 2, 12),
+              child: _buildTodoContent(
+                todo,
+                isEditing,
+                priorityColor,
+                catColor,
               ),
             ),
-            // Right actions
-            if (!isEditing) ...[
-              Align(
-                alignment: Alignment.center,
-                child: AnimatedTodoCheckbox(
-                  checked: todo.completed,
-                  onChanged: (_) => _toggleTodo(todo.id),
-                  activeColor: priorityColor,
-                ),
-              ),
-              // Drag handle
-              if (total > 1)
-                ReorderableDragStartListener(
-                  index: index,
-                  child: SizedBox(
-                    width: 34,
+          ),
+          if (!isEditing) ...[
+            AnimatedTodoCheckbox(
+              checked: todo.completed,
+              onChanged: (_) => _toggleTodo(todo.id),
+              activeColor: priorityColor,
+            ),
+            if (total > 1)
+              ReorderableDragStartListener(
+                index: index,
+                child: Semantics(
+                  button: true,
+                  label: '拖动排序',
+                  child: const SizedBox(
+                    width: 36,
+                    height: 48,
                     child: Icon(
                       Icons.drag_indicator_rounded,
                       size: 18,
@@ -873,34 +901,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.only(right: 2),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: IconButton(
-                    onPressed: () => _startEdit(todo.id),
-                    tooltip: '编辑',
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                    icon: const Icon(
-                      Icons.edit_outlined,
-                      size: 17,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: IconButton(
+                onPressed: () => _startEdit(todo.id),
+                tooltip: '编辑',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(
+                  minWidth: 40,
+                  minHeight: 40,
+                ),
+                icon: const Icon(
+                  Icons.edit_outlined,
+                  size: 17,
+                  color: AppTheme.textSecondary,
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildTodoContent(Todo todo, bool isEditing, Color priorityColor, Color catColor) {
+  Widget _buildTodoContent(
+    Todo todo,
+    bool isEditing,
+    Color priorityColor,
+    Color catColor,
+  ) {
     if (isEditing) {
       return Row(
         children: [
@@ -959,9 +989,14 @@ class _HomeScreenState extends State<HomeScreen> {
           duration: const Duration(milliseconds: 300),
           style: TextStyle(
             fontSize: 15,
+            height: 1.35,
             fontWeight: FontWeight.w500,
-            color: todo.completed ? AppTheme.textQuaternary : AppTheme.textPrimary,
-            decoration: todo.completed ? TextDecoration.lineThrough : TextDecoration.none,
+            color: todo.completed
+                ? AppTheme.textQuaternary
+                : AppTheme.textPrimary,
+            decoration: todo.completed
+                ? TextDecoration.lineThrough
+                : TextDecoration.none,
             decorationColor: AppTheme.textQuaternary,
             decorationThickness: 2.0,
           ),
@@ -978,7 +1013,10 @@ class _HomeScreenState extends State<HomeScreen> {
               _formatTime(todo.createdAt),
               style: TextStyle(
                 fontSize: 11,
-                color: todo.completed ? AppTheme.textQuaternary : AppTheme.textSecondary,
+                height: 1.2,
+                color: todo.completed
+                    ? AppTheme.textQuaternary
+                    : AppTheme.textSecondary,
               ),
             ),
             // Priority tag
@@ -986,7 +1024,9 @@ class _HomeScreenState extends State<HomeScreen> {
               duration: const Duration(milliseconds: 300),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: priorityColor.withValues(alpha: todo.completed ? 0.08 : 0.18),
+                color: priorityColor.withValues(
+                  alpha: todo.completed ? 0.08 : 0.18,
+                ),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
@@ -994,7 +1034,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: priorityColor.withValues(alpha: todo.completed ? 0.4 : 1.0),
+                  color: priorityColor.withValues(
+                    alpha: todo.completed ? 0.4 : 1.0,
+                  ),
                 ),
               ),
             ),
@@ -1003,7 +1045,9 @@ class _HomeScreenState extends State<HomeScreen> {
               duration: const Duration(milliseconds: 300),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: catColor.withValues(alpha: todo.completed ? 0.08 : 0.15),
+                color: catColor.withValues(
+                  alpha: todo.completed ? 0.08 : 0.15,
+                ),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Row(
@@ -1012,7 +1056,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Icon(
                     AppTheme.categoryIcon(todo.category),
                     size: 10,
-                    color: catColor.withValues(alpha: todo.completed ? 0.4 : 1.0),
+                    color: catColor.withValues(
+                      alpha: todo.completed ? 0.4 : 1.0,
+                    ),
                   ),
                   const SizedBox(width: 3),
                   Text(
@@ -1020,7 +1066,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: catColor.withValues(alpha: todo.completed ? 0.4 : 1.0),
+                      color: catColor.withValues(
+                        alpha: todo.completed ? 0.4 : 1.0,
+                      ),
                     ),
                   ),
                 ],
@@ -1071,7 +1119,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             child: Icon(
-              _searchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.task_alt_rounded,
+              _searchQuery.isNotEmpty
+                  ? Icons.search_off_rounded
+                  : Icons.task_alt_rounded,
               size: 32,
               color: AppTheme.accent.withValues(alpha: 0.4),
             ),

@@ -36,6 +36,10 @@ Builds older than `2.3.0` used an ephemeral debug certificate and must be
 uninstalled once before installing the first production-signed APK. Future
 production-signed versions can be installed as normal in-place upgrades.
 
+The current release is `2.4.0` (`versionCode 5`). It keeps the same production
+certificate and Android package name, so it can overwrite an installed
+production-signed FlowDo build without clearing app data.
+
 ## Tech Stack
 
 - Flutter

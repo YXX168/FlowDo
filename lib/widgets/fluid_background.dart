@@ -103,28 +103,28 @@ class _FluidBackgroundState extends State<FluidBackground>
             child: AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
-              // Smooth mouse interpolation
-              _mouse = Offset(
-                _mouse.dx + (_targetMouse.dx - _mouse.dx) * 0.05,
-                _mouse.dy + (_targetMouse.dy - _mouse.dy) * 0.05,
-              );
+                // Smooth mouse interpolation
+                _mouse = Offset(
+                  _mouse.dx + (_targetMouse.dx - _mouse.dx) * 0.05,
+                  _mouse.dy + (_targetMouse.dy - _mouse.dy) * 0.05,
+                );
 
-              if (_shaderLoaded && _shader != null) {
-                return CustomPaint(
-                  painter: _ShaderPainter(
-                    shader: _shader!,
-                    time: _controller.value * 60,
+                if (_shaderLoaded && _shader != null) {
+                  return CustomPaint(
+                    painter: _ShaderPainter(
+                      shader: _shader!,
+                      time: _controller.value * 60,
+                      size: size,
+                      mouse: _mouse,
+                    ),
                     size: size,
-                    mouse: _mouse,
-                  ),
+                  );
+                }
+                // Fallback: animated gradient background
+                return CustomPaint(
+                  painter: _FallbackPainter(_controller.value),
                   size: size,
                 );
-              }
-              // Fallback: animated gradient background
-              return CustomPaint(
-                painter: _FallbackPainter(_controller.value),
-                size: size,
-              );
               },
             ),
           );
@@ -200,21 +200,21 @@ class _FallbackPainter extends CustomPainter {
 
     // Color blobs with domain-warping approximation
     final colors = [
-      const Color(0xFFFAF099), // yellow
-      const Color(0xFFFA7308), // orange
-      const Color(0xFFE62673), // pink
-      const Color(0xFF591AB3), // purple
+      const Color(0xFF685522), // muted gold
+      const Color(0xFF7A3218), // muted orange
+      const Color(0xFF7A1747), // muted pink
+      const Color(0xFF3F176F), // muted purple
     ];
 
     final positions = [
-      Offset(0.2 + sin(time * 0.32) * 0.12, 0.78 + cos(time * 0.26) * 0.08),
-      Offset(0.8 + cos(time * 0.38) * 0.12, 0.86 + sin(time * 0.30) * 0.08),
-      Offset(0.7 + sin(time * 0.20) * 0.16, 0.64 + cos(time * 0.44) * 0.09),
-      Offset(0.3 + cos(time * 0.26) * 0.16, 0.70 + sin(time * 0.34) * 0.09),
+      Offset(0.18 + sin(time * 0.24) * 0.10, 0.92 + cos(time * 0.20) * 0.05),
+      Offset(0.84 + cos(time * 0.28) * 0.10, 0.98 + sin(time * 0.22) * 0.04),
+      Offset(0.72 + sin(time * 0.17) * 0.13, 0.84 + cos(time * 0.30) * 0.06),
+      Offset(0.28 + cos(time * 0.20) * 0.13, 0.88 + sin(time * 0.25) * 0.06),
     ];
 
-    final alphas = [0.22, 0.18, 0.17, 0.21];
-    final radii = [0.42, 0.40, 0.36, 0.40];
+    final alphas = [0.13, 0.12, 0.12, 0.15];
+    final radii = [0.32, 0.34, 0.30, 0.33];
 
     for (int i = 0; i < 4; i++) {
       // Add noise-like distortion to position
@@ -254,7 +254,7 @@ class _FallbackPainter extends CustomPainter {
           const Color(0x4D14121B),
           Colors.transparent,
         ],
-        stops: [0.0, 0.24 + breath * 0.03, 0.48, 0.70, 1.0],
+        stops: [0.0, 0.38 + breath * 0.02, 0.58, 0.76, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawRect(Rect.fromLTWH(0, 0, w, h), fadePaint);
 
