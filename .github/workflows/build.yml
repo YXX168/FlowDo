@@ -82,7 +82,7 @@ jobs:
           test -x "$AAPT"
           APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           "$APKSIGNER" verify --verbose "$APK"
-          ACTUAL_CERT_SHA256=$("$APKSIGNER" verify --print-certs "$APK" | awk -F': ' '/certificate SHA-256 digest/ {print $2; exit}' | tr -d '[:space:]:' | tr '[:lower:]' '[:upper:]')
+          ACTUAL_CERT_SHA256=$("$APKSIGNER" verify --print-certs "$APK" | awk '/certificate SHA-256 digest/ {sub(/^.*certificate SHA-256 digest:[[:space:]]*/, ""); print; exit}' | tr -d '[:space:]:' | tr '[:lower:]' '[:upper:]')
           EXPECTED_CERT_SHA256=$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d '[:space:]:' | tr '[:lower:]' '[:upper:]')
           PACKAGE_NAME=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
           test -n "$EXPECTED_CERT_SHA256"
