@@ -142,9 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final removed = _todos[index];
     HapticFeedback.heavyImpact();
     setState(() {
-      _todos = normalizeTodoOrder(
-        _todos.where((todo) => todo.id != id),
-      );
+      _todos = normalizeTodoOrder(_todos.where((todo) => todo.id != id));
     });
     unawaited(_saveTodos());
     _showMessage(
@@ -173,7 +171,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _saveEdit() {
     if (_editingId == null) return;
     final text = _editController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      // Treat an emptied editor as "cancel" instead of silently doing
+      // nothing, which leaves the row stuck in edit mode.
+      _cancelEdit();
+      return;
+    }
     final index = _todos.indexWhere((todo) => todo.id == _editingId);
     if (index < 0) {
       _cancelEdit();
@@ -194,13 +197,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _clearCompleted() {
     final previousTodos = List<Todo>.of(_todos);
+    final completedIndices = <int>[
+      for (var i = 0; i < previousTodos.length; i++)
+        if (previousTodos[i].completed) i,
+    ];
     final count = _doneCount;
     if (count == 0) return;
     HapticFeedback.mediumImpact();
     setState(() {
-      _todos = normalizeTodoOrder(
-        _todos.where((todo) => !todo.completed),
-      );
+      _todos = normalizeTodoOrder(_todos.where((todo) => !todo.completed));
     });
     unawaited(_saveTodos());
     _showMessage(
@@ -208,7 +213,15 @@ class _HomeScreenState extends State<HomeScreen> {
       action: SnackBarAction(
         label: '撤销',
         onPressed: () {
-          setState(() => _todos = previousTodos);
+          final restored = List<Todo>.of(_todos);
+          for (var offset = 0; offset < completedIndices.length; offset++) {
+            final at = (completedIndices[offset] + offset).clamp(
+              0,
+              restored.length,
+            );
+            restored.insert(at, previousTodos[completedIndices[offset]]);
+          }
+          setState(() => _todos = normalizeTodoOrder(restored));
           unawaited(_saveTodos());
         },
       ),
@@ -216,6 +229,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _reorderTodos(int oldIndex, int newIndex) {
+    // Guard against reorders triggered while the visible list is not the
+    // full list (search or status filter).
+    if (_currentFilter != 'all' || _searchQuery.isNotEmpty) return;
     HapticFeedback.selectionClick();
     setState(() {
       _todos = reorderVisibleTodos(
@@ -300,18 +316,23 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-      child: Column(
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 12),
-          _buildProgressOverview(),
-          const SizedBox(height: 12),
-          _buildAddSection(),
-          const SizedBox(height: 10),
-          _buildFilterSection(),
-          const SizedBox(height: 6),
-          Expanded(child: _buildTodoList()),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 12),
+            _buildSearchBar(),
+            if (_isSearchVisible) const SizedBox(height: 12),
+            _buildProgressOverview(),
+            const SizedBox(height: 12),
+            _buildAddSection(),
+            const SizedBox(height: 10),
+            _buildFilterSection(),
+            const SizedBox(height: 6),
+            _buildTodoList(),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
@@ -356,10 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               _buildStorageStatus(),
-              if (showDate) ...[
-                _buildDateBadge(),
-                const SizedBox(width: 8),
-              ],
+              if (showDate) ...[_buildDateBadge(), const SizedBox(width: 8)],
               _buildSearchToggle(),
             ],
           );
@@ -633,8 +651,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSearchBar(),
-          if (_isSearchVisible) const SizedBox(height: 10),
           const Text(
             '添加待办',
             style: TextStyle(
@@ -653,41 +669,57 @@ class _HomeScreenState extends State<HomeScreen> {
               border: Border.all(color: const Color(0x14FFFFFF)),
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    textAlignVertical: TextAlignVertical.center,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: AppTheme.textPrimary,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: '写下一件要完成的事',
-                      hintStyle: TextStyle(color: AppTheme.textQuaternary),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 16,
-                      ),
-                    ),
-                    onSubmitted: (_) => _addTodo(),
-                  ),
+            child: TextField(
+              controller: _inputController,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                hintText: '写下一件要完成的事',
+                hintStyle: TextStyle(color: AppTheme.textQuaternary),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 16,
                 ),
-                AnimatedPrioritySelector(
-                  selected: _selectedPriority,
-                  onChanged: (p) => setState(() => _selectedPriority = p),
-                ),
-                const SizedBox(width: 10),
-              ],
+              ),
+              onSubmitted: (_) => _addTodo(),
             ),
           ),
           const SizedBox(height: 8),
-          // Category chips + submit button
+          // Priority selector + submit button
           Row(
             children: [
+              const Text(
+                '优先级',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textTertiary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              AnimatedPrioritySelector(
+                selected: _selectedPriority,
+                onChanged: (p) => setState(() => _selectedPriority = p),
+              ),
+              const Spacer(),
+              GlassSubmitButton(onPressed: _addTodo),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Category chips
+          Row(
+            children: [
+              const Text(
+                '分类',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textTertiary,
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -705,8 +737,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              GlassSubmitButton(onPressed: _addTodo),
             ],
           ),
         ],
@@ -788,9 +818,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return ReorderableListView.builder(
-      key: ValueKey('${_currentFilter}_$_searchQuery'),
+      key: ValueKey(_currentFilter),
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
       itemCount: filtered.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       buildDefaultDragHandles: false,
       onReorderItem: _reorderTodos,
       proxyDecorator: (child, index, animation) {
@@ -840,6 +872,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final isEditing = _editingId == todo.id;
     final priorityColor = AppTheme.priorityColor(todo.priority);
     final catColor = AppTheme.categoryColor(todo.category);
+    // Reordering only makes sense on the full list: hide the drag handle
+    // while searching or viewing a status filter.
+    final canReorder =
+        _currentFilter == 'all' && _searchQuery.isEmpty && total > 1;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -855,72 +891,73 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            width: 4,
-            height: 64,
-            decoration: BoxDecoration(
-              color: priorityColor.withValues(
-                alpha: todo.completed ? 0.28 : 0.9,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 4,
+              decoration: BoxDecoration(
+                color: priorityColor.withValues(
+                  alpha: todo.completed ? 0.28 : 0.9,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 2, 12),
-              child: _buildTodoContent(
-                todo,
-                isEditing,
-                priorityColor,
-                catColor,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 2, 12),
+                child: _buildTodoContent(
+                  todo,
+                  isEditing,
+                  priorityColor,
+                  catColor,
+                ),
               ),
             ),
-          ),
-          if (!isEditing) ...[
-            AnimatedTodoCheckbox(
-              checked: todo.completed,
-              onChanged: (_) => _toggleTodo(todo.id),
-              activeColor: priorityColor,
-            ),
-            if (total > 1)
-              ReorderableDragStartListener(
-                index: index,
-                child: Semantics(
-                  button: true,
-                  label: '拖动排序',
-                  child: const SizedBox(
-                    width: 36,
-                    height: 48,
-                    child: Icon(
-                      Icons.drag_indicator_rounded,
-                      size: 18,
-                      color: AppTheme.textQuaternary,
+            if (!isEditing) ...[
+              AnimatedTodoCheckbox(
+                checked: todo.completed,
+                onChanged: (_) => _toggleTodo(todo.id),
+                activeColor: priorityColor,
+              ),
+              if (canReorder)
+                ReorderableDragStartListener(
+                  index: index,
+                  child: Semantics(
+                    button: true,
+                    label: '拖动排序',
+                    child: const SizedBox(
+                      width: 36,
+                      height: 48,
+                      child: Icon(
+                        Icons.drag_indicator_rounded,
+                        size: 18,
+                        color: AppTheme.textQuaternary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: IconButton(
-                onPressed: () => _startEdit(todo.id),
-                tooltip: '编辑',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(
-                  minWidth: 40,
-                  minHeight: 40,
+              Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: IconButton(
+                  onPressed: () => _startEdit(todo.id),
+                  tooltip: '编辑',
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  icon: const Icon(
+                    Icons.edit_outlined,
+                    size: 17,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  size: 17,
-                  color: AppTheme.textSecondary,
-                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -951,8 +988,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _saveEdit,
             tooltip: '保存',
             style: IconButton.styleFrom(
-              backgroundColor:
-                  AppTheme.priorityLow.withValues(alpha: 0.15),
+              backgroundColor: AppTheme.priorityLow.withValues(alpha: 0.15),
               minimumSize: const Size(40, 40),
               padding: EdgeInsets.zero,
             ),
@@ -967,8 +1003,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _cancelEdit,
             tooltip: '取消',
             style: IconButton.styleFrom(
-              backgroundColor:
-                  AppTheme.priorityHigh.withValues(alpha: 0.15),
+              backgroundColor: AppTheme.priorityHigh.withValues(alpha: 0.15),
               minimumSize: const Size(40, 40),
               padding: EdgeInsets.zero,
             ),
@@ -1045,9 +1080,7 @@ class _HomeScreenState extends State<HomeScreen> {
               duration: const Duration(milliseconds: 300),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: catColor.withValues(
-                  alpha: todo.completed ? 0.08 : 0.15,
-                ),
+                color: catColor.withValues(alpha: todo.completed ? 0.08 : 0.15),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Row(
@@ -1097,52 +1130,58 @@ class _HomeScreenState extends State<HomeScreen> {
       desc = '完成一些待办后将会显示在这里';
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.elasticOut,
-          builder: (context, value, child) {
-            return Transform.scale(scale: value, child: child);
-          },
-          child: Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppTheme.accent.withValues(alpha: 0.08),
-              border: Border.all(
-                color: AppTheme.accent.withValues(alpha: 0.2),
-                width: 2,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.elasticOut,
+            builder: (context, value, child) {
+              return Transform.scale(scale: value, child: child);
+            },
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.accent.withValues(alpha: 0.08),
+                border: Border.all(
+                  color: AppTheme.accent.withValues(alpha: 0.2),
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                _searchQuery.isNotEmpty
+                    ? Icons.search_off_rounded
+                    : Icons.task_alt_rounded,
+                size: 32,
+                color: AppTheme.accent.withValues(alpha: 0.4),
               ),
             ),
-            child: Icon(
-              _searchQuery.isNotEmpty
-                  ? Icons.search_off_rounded
-                  : Icons.task_alt_rounded,
-              size: 32,
-              color: AppTheme.accent.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.textSecondary,
+          const SizedBox(height: 6),
+          Text(
+            desc,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textQuaternary,
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          desc,
-          style: const TextStyle(fontSize: 13, color: AppTheme.textQuaternary),
-          textAlign: TextAlign.center,
-        ),
-      ],
+        ],
+      ),
     );
   }
 

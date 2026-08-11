@@ -36,19 +36,13 @@ class _AnimatedPrioritySelectorState extends State<AnimatedPrioritySelector>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _scaleAnim = CurvedAnimation(
-      parent: _bounceCtrl,
-      curve: Curves.elasticOut,
-    );
+    _scaleAnim = CurvedAnimation(parent: _bounceCtrl, curve: Curves.elasticOut);
 
     _glowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
-    _glowAnim = CurvedAnimation(
-      parent: _glowCtrl,
-      curve: Curves.easeInOut,
-    );
+    _glowAnim = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut);
   }
 
   @override
@@ -84,69 +78,71 @@ class _AnimatedPrioritySelectorState extends State<AnimatedPrioritySelector>
               widget.onChanged(p);
             },
             child: AnimatedBuilder(
-            animation: Listenable.merge([_scaleAnim, _glowAnim]),
-            builder: (context, child) {
-              final scale = isActive ? 1.0 + _scaleAnim.value * 0.35 : 1.0;
-              final glowAlpha = isActive ? 0.3 + _glowAnim.value * 0.3 : 0.0;
-              return Transform.scale(
-                scale: scale,
-                child: Container(
-                  margin: const EdgeInsets.only(left: 2),
-                  width: 36,
-                  height: 44,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Glow ring
-                      if (isActive)
-                        Container(
-                          width: 28,
-                          height: 28,
+              animation: Listenable.merge([_scaleAnim, _glowAnim]),
+              builder: (context, child) {
+                final scale = isActive ? 1.0 + _scaleAnim.value * 0.35 : 1.0;
+                final glowAlpha = isActive ? 0.3 + _glowAnim.value * 0.3 : 0.0;
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 2),
+                    width: 36,
+                    height: 44,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Glow ring
+                        if (isActive)
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color.withValues(alpha: glowAlpha),
+                            ),
+                          ),
+                        // Main dot
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          width: 20,
+                          height: 20,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: color.withValues(alpha: glowAlpha),
+                            color: isActive
+                                ? color
+                                : color.withValues(alpha: 0.15),
+                            border: Border.all(
+                              color: color,
+                              width: isActive ? 0 : 2,
+                            ),
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.6),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : [],
                           ),
                         ),
-                      // Main dot
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isActive ? color : color.withValues(alpha: 0.15),
-                          border: Border.all(
-                            color: color,
-                            width: isActive ? 0 : 2,
+                        // Inner highlight
+                        if (isActive)
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.8),
+                            ),
                           ),
-                          boxShadow: isActive
-                              ? [
-                                  BoxShadow(
-                                    color: color.withValues(alpha: 0.6),
-                                    blurRadius: 10,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : [],
-                        ),
-                      ),
-                      // Inner highlight
-                      if (isActive)
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
             ),
           ),
         );
@@ -183,46 +179,48 @@ class AnimatedCategoryChip extends StatelessWidget {
           onTap();
         },
         child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.2) : const Color(0x0DFFFFFF),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color : const Color(0x14FFFFFF),
-            width: 1.5,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              AppTheme.categoryIcon(category),
-              size: 14,
-              color: isSelected ? color : AppTheme.textSecondary,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? color.withValues(alpha: 0.2)
+                : const Color(0x0DFFFFFF),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? color : const Color(0x14FFFFFF),
+              width: 1.5,
             ),
-            const SizedBox(width: 6),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                AppTheme.categoryIcon(category),
+                size: 14,
                 color: isSelected ? color : AppTheme.textSecondary,
               ),
-              child: Text(AppTheme.categoryLabel(category)),
-            ),
-          ],
-        ),
+              const SizedBox(width: 6),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? color : AppTheme.textSecondary,
+                ),
+                child: Text(AppTheme.categoryLabel(category)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -262,16 +260,18 @@ class _AnimatedTodoCheckboxState extends State<AnimatedTodoCheckbox>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-    );
+    _scaleAnim = Tween<double>(
+      begin: 0.7,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
     _checkAnim = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
     );
-    _glowAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _glowAnim = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     if (widget.checked) _controller.value = 1.0;
   }
 
@@ -311,40 +311,40 @@ class _AnimatedTodoCheckboxState extends State<AnimatedTodoCheckbox>
           height: 44,
           child: Center(
             child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          return Transform.scale(
-            scale: _scaleAnim.value,
-            child: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: widget.checked
-                      ? activeColor
-                      : const Color(0x33FFFFFF),
-                  width: 2,
-                ),
-                color: widget.checked
-                    ? activeColor
-                    : Colors.transparent,
-                boxShadow: widget.checked
-                    ? [
-                        BoxShadow(
-                          color: activeColor.withValues(alpha: 0.4 * _glowAnim.value),
-                          blurRadius: 8,
-                          spreadRadius: 0,
-                        ),
-                      ]
-                    : [],
-              ),
-              child: CustomPaint(
-                painter: _CheckPainter(_checkAnim.value),
-              ),
-            ),
-          );
-        },
+              animation: _controller,
+              builder: (context, _) {
+                return Transform.scale(
+                  scale: _scaleAnim.value,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: widget.checked
+                            ? activeColor
+                            : const Color(0x33FFFFFF),
+                        width: 2,
+                      ),
+                      color: widget.checked ? activeColor : Colors.transparent,
+                      boxShadow: widget.checked
+                          ? [
+                              BoxShadow(
+                                color: activeColor.withValues(
+                                  alpha: 0.4 * _glowAnim.value,
+                                ),
+                                blurRadius: 8,
+                                spreadRadius: 0,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: CustomPaint(
+                      painter: _CheckPainter(_checkAnim.value),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -414,18 +414,16 @@ class _GlassSubmitButtonState extends State<GlassSubmitButton>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.85).animate(
-      CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut),
-    );
+    _scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 0.85,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut));
 
     _glowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-    _glowAnim = CurvedAnimation(
-      parent: _glowCtrl,
-      curve: Curves.easeInOut,
-    );
+    _glowAnim = CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut);
   }
 
   @override
@@ -452,48 +450,47 @@ class _GlassSubmitButtonState extends State<GlassSubmitButton>
               },
         onTapCancel: () => _pressCtrl.reverse(),
         child: AnimatedBuilder(
-        animation: Listenable.merge([_scaleAnim, _glowAnim]),
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnim.value,
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppTheme.accent, AppTheme.accentHover],
-                ),
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.accent.withValues(alpha: 0.4 + _glowAnim.value * 0.2),
-                    blurRadius: 12 + _glowAnim.value * 8,
-                    offset: const Offset(0, 4),
+          animation: Listenable.merge([_scaleAnim, _glowAnim]),
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnim.value,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppTheme.accent, AppTheme.accentHover],
                   ),
-                ],
-              ),
-              child: widget.isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Padding(
-                        padding: EdgeInsets.all(12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accent.withValues(
+                        alpha: 0.4 + _glowAnim.value * 0.2,
+                      ),
+                      blurRadius: 12 + _glowAnim.value * 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: widget.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(
                           color: Colors.white,
                           strokeWidth: 2,
                         ),
+                      )
+                    : const Icon(
+                        Icons.add_rounded,
+                        color: Colors.white,
+                        size: 26,
                       ),
-                    )
-                  : const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 26,
-                    ),
-            ),
-          );
-        },
+              ),
+            );
+          },
         ),
       ),
     );
@@ -549,9 +546,7 @@ class AnimatedFilterTab extends StatelessWidget {
               color: isActive ? null : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: isActive
-                  ? Border.all(
-                      color: AppTheme.accent.withValues(alpha: 0.4),
-                    )
+                  ? Border.all(color: AppTheme.accent.withValues(alpha: 0.4))
                   : Border.all(color: Colors.transparent),
               boxShadow: isActive
                   ? [
@@ -628,11 +623,7 @@ class AnimatedProgressBar extends StatefulWidget {
   final double progress;
   final Color? color;
 
-  const AnimatedProgressBar({
-    super.key,
-    required this.progress,
-    this.color,
-  });
+  const AnimatedProgressBar({super.key, required this.progress, this.color});
 
   @override
   State<AnimatedProgressBar> createState() => _AnimatedProgressBarState();

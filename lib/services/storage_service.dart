@@ -21,23 +21,33 @@ class StorageService {
 
   Future<void> _saveQueue = Future<void>.value();
 
-  Future<String> get _filePath async {
+  Future<String>? _cachedFilePath;
+
+  Future<String> get _filePath {
+    return _cachedFilePath ??= _resolveFilePath();
+  }
+
+  Future<String> _resolveFilePath() async {
     final dir = await getApplicationDocumentsDirectory();
     return '${dir.path}${Platform.pathSeparator}$_fileName';
   }
 
   Future<List<Todo>> loadTodos() async {
-    try {
-      final path = await _filePath;
-      final file = File(path);
-      final backup = File('$path.bak');
-      // Recover the last known-good file if the app stopped between the two
-      // rename operations of an atomic save.
-      if (!await file.exists() && await backup.exists()) {
+    final path = await _filePath;
+    final file = File(path);
+    final backup = File('$path.bak');
+    // Recover the last known-good file if the app stopped between the two
+    // rename operations of an atomic save.
+    if (!await file.exists() && await backup.exists()) {
+      try {
         await backup.rename(path);
+      } on FileSystemException {
+        // Keep the backup in place so it can be recovered on next launch.
       }
-      if (!await file.exists()) return [];
+    }
+    if (!await file.exists()) return [];
 
+    try {
       final content = await file.readAsString();
       if (content.trim().isEmpty) return [];
 
@@ -45,41 +55,28 @@ class StorageService {
       if (decoded is! List<dynamic>) {
         throw const FormatException('Todo data must be a JSON list.');
       }
-
-      final seenIds = <String>{};
-      final todos = <Todo>[];
-      for (var index = 0; index < decoded.length; index++) {
-        final item = decoded[index];
-        if (item is! Map<String, dynamic>) continue;
-
-        var todo = Todo.fromJson(item);
-        var id = todo.id.trim();
-        if (id.isEmpty || seenIds.contains(id)) {
-          id = '${todo.createdAt}-$index';
-          todo = Todo(
-            id: id,
-            text: todo.text,
-            completed: todo.completed,
-            priority: todo.priority,
-            createdAt: todo.createdAt,
-            dueDate: todo.dueDate,
-            category: todo.category,
-            order: todo.order,
-          );
-        }
-        seenIds.add(id);
-        todos.add(todo);
-      }
-
-      todos.sort((a, b) {
-        final byOrder = a.order.compareTo(b.order);
-        return byOrder != 0 ? byOrder : a.createdAt.compareTo(b.createdAt);
-      });
-      return normalizeTodoOrder(todos);
+      return _decodeTodos(decoded);
     } on FormatException catch (error) {
-      final path = await _filePath;
+      // The main file is corrupt. Try the last known-good backup before
+      // giving up so a single interrupted write cannot wipe the list.
+      if (await backup.exists()) {
+        try {
+          final backupContent = await backup.readAsString();
+          if (backupContent.trim().isNotEmpty) {
+            final backupDecoded = jsonDecode(backupContent);
+            if (backupDecoded is List<dynamic>) {
+              await _preserveCorruptFile(file);
+              return _decodeTodos(backupDecoded);
+            }
+          }
+        } on FormatException {
+          // The backup is corrupt too; fall through to the error path.
+        } on FileSystemException {
+          // The backup is unreadable; fall through to the error path.
+        }
+      }
       try {
-        await _preserveCorruptFile(File(path));
+        await _preserveCorruptFile(file);
       } on FileSystemException {
         // The original file remains untouched if creating the backup fails.
       }
@@ -89,10 +86,44 @@ class StorageService {
     }
   }
 
+  List<Todo> _decodeTodos(List<dynamic> decoded) {
+    final seenIds = <String>{};
+    final todos = <Todo>[];
+    for (var index = 0; index < decoded.length; index++) {
+      final item = decoded[index];
+      if (item is! Map<String, dynamic>) continue;
+
+      var todo = Todo.fromJson(item);
+      var id = todo.id.trim();
+      if (id.isEmpty || seenIds.contains(id)) {
+        id = '${todo.createdAt}-$index';
+        todo = Todo(
+          id: id,
+          text: todo.text,
+          completed: todo.completed,
+          priority: todo.priority,
+          createdAt: todo.createdAt,
+          dueDate: todo.dueDate,
+          category: todo.category,
+          order: todo.order,
+        );
+      }
+      seenIds.add(id);
+      todos.add(todo);
+    }
+
+    todos.sort((a, b) {
+      final byOrder = a.order.compareTo(b.order);
+      return byOrder != 0 ? byOrder : a.createdAt.compareTo(b.createdAt);
+    });
+    return normalizeTodoOrder(todos);
+  }
+
   Future<void> saveTodos(List<Todo> todos) {
     // Serialize now so later in-memory changes cannot alter an in-flight save.
-    final snapshot = const JsonEncoder.withIndent('  ')
-        .convert(todos.map((todo) => todo.toJson()).toList());
+    final snapshot = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(todos.map((todo) => todo.toJson()).toList());
     final operation = _saveQueue.then((_) => _writeSnapshot(snapshot));
 
     // Keep the queue usable after a failed write while still returning the
