@@ -57,7 +57,8 @@ class Todo {
       priority: TodoPriority.normalize(json['priority']),
       createdAt: createdAt is int
           ? createdAt
-          : DateTime.now().millisecondsSinceEpoch,
+          : int.tryParse(createdAt is String ? createdAt : '') ??
+              DateTime.now().millisecondsSinceEpoch,
       dueDate: dueDate is int ? dueDate : null,
       category: TodoCategory.normalize(json['category']),
       order: order is int ? order : 0,

@@ -66,6 +66,9 @@ class StorageService {
             final backupDecoded = jsonDecode(backupContent);
             if (backupDecoded is List<dynamic>) {
               await _preserveCorruptFile(file);
+              // Restore the last known-good backup as the new main file so
+              // the next launch does not need to go through recovery again.
+              await backup.copy(path);
               return _decodeTodos(backupDecoded);
             }
           }

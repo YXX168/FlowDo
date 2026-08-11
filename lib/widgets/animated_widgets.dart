@@ -387,12 +387,12 @@ class _CheckPainter extends CustomPainter {
 // Glass Submit Button with press-scale + glow + shimmer
 // ============================================================
 class GlassSubmitButton extends StatefulWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isLoading;
 
   const GlassSubmitButton({
     super.key,
-    required this.onPressed,
+    this.onPressed,
     this.isLoading = false,
   });
 
@@ -435,62 +435,66 @@ class _GlassSubmitButtonState extends State<GlassSubmitButton>
 
   @override
   Widget build(BuildContext context) {
+    final bool enabled = !widget.isLoading && widget.onPressed != null;
     return Semantics(
       button: true,
-      enabled: !widget.isLoading,
+      enabled: enabled,
       label: '添加待办事项',
       child: GestureDetector(
-        onTapDown: widget.isLoading ? null : (_) => _pressCtrl.forward(),
-        onTapUp: widget.isLoading
-            ? null
-            : (_) {
+        onTapDown: enabled ? (_) => _pressCtrl.forward() : null,
+        onTapUp: enabled
+            ? (_) {
                 _pressCtrl.reverse();
                 HapticFeedback.mediumImpact();
-                widget.onPressed();
-              },
+                widget.onPressed!();
+              }
+            : null,
         onTapCancel: () => _pressCtrl.reverse(),
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_scaleAnim, _glowAnim]),
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _scaleAnim.value,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppTheme.accent, AppTheme.accentHover],
-                  ),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.accent.withValues(
-                        alpha: 0.4 + _glowAnim.value * 0.2,
-                      ),
-                      blurRadius: 12 + _glowAnim.value * 8,
-                      offset: const Offset(0, 4),
+        child: Opacity(
+          opacity: enabled ? 1.0 : 0.45,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_scaleAnim, _glowAnim]),
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _scaleAnim.value,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppTheme.accent, AppTheme.accentHover],
                     ),
-                  ],
-                ),
-                child: widget.isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accent.withValues(
+                          alpha: 0.4 + _glowAnim.value * 0.2,
                         ),
-                      )
-                    : const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 26,
+                        blurRadius: 12 + _glowAnim.value * 8,
+                        offset: const Offset(0, 4),
                       ),
-              ),
-            );
-          },
+                    ],
+                  ),
+                  child: widget.isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.add_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

@@ -120,8 +120,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ..._todos,
       ]);
       _inputController.clear();
-      _selectedPriority = TodoPriority.medium;
-      _selectedCategory = TodoCategory.other;
+      // Keep the chosen priority and category so consecutive entries with
+      // the same attributes do not need to be re-selected every time.
     });
     unawaited(_saveTodos());
   }
@@ -316,23 +316,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 12),
-            _buildSearchBar(),
-            if (_isSearchVisible) const SizedBox(height: 12),
-            _buildProgressOverview(),
-            const SizedBox(height: 12),
-            _buildAddSection(),
-            const SizedBox(height: 10),
-            _buildFilterSection(),
-            const SizedBox(height: 6),
-            _buildTodoList(),
-            const SizedBox(height: 12),
-          ],
-        ),
+      child: CustomScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 12),
+                _buildSearchBar(),
+                if (_isSearchVisible) const SizedBox(height: 12),
+                _buildProgressOverview(),
+                const SizedBox(height: 12),
+                _buildAddSection(),
+                const SizedBox(height: 10),
+                _buildFilterSection(),
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+          _buildTodoListSliver(),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+        ],
       ),
     );
   }
@@ -671,6 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: TextField(
               controller: _inputController,
+              enabled: !_isLoading,
               textAlignVertical: TextAlignVertical.center,
               style: const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
               decoration: const InputDecoration(
@@ -701,10 +708,13 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 6),
               AnimatedPrioritySelector(
                 selected: _selectedPriority,
-                onChanged: (p) => setState(() => _selectedPriority = p),
+                onChanged: (p) {
+                  if (_isLoading) return;
+                  setState(() => _selectedPriority = p);
+                },
               ),
               const Spacer(),
-              GlassSubmitButton(onPressed: _addTodo),
+              GlassSubmitButton(onPressed: _isLoading ? null : _addTodo),
             ],
           ),
           const SizedBox(height: 8),
@@ -730,7 +740,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: AnimatedCategoryChip(
                           category: cat,
                           isSelected: _selectedCategory == cat,
-                          onTap: () => setState(() => _selectedCategory = cat),
+                          onTap: () {
+                            if (_isLoading) return;
+                            setState(() => _selectedCategory = cat);
+                          },
                         ),
                       );
                     }).toList(),
@@ -801,12 +814,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ==================== Todo List ====================
-  Widget _buildTodoList() {
+  Widget _buildTodoListSliver() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: AppTheme.accent,
-          strokeWidth: 2,
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppTheme.accent,
+            strokeWidth: 2,
+          ),
         ),
       );
     }
@@ -814,57 +830,60 @@ class _HomeScreenState extends State<HomeScreen> {
     final filtered = _filteredTodos;
 
     if (filtered.isEmpty) {
-      return Center(child: _buildEmptyState());
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: _buildEmptyState()),
+      );
     }
 
-    return ReorderableListView.builder(
-      key: ValueKey(_currentFilter),
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
-      itemCount: filtered.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      buildDefaultDragHandles: false,
-      onReorderItem: _reorderTodos,
-      proxyDecorator: (child, index, animation) {
-        return AnimatedBuilder(
-          animation: animation,
-          builder: (context, _) {
-            final scale = 1.0 + animation.value * 0.025;
-            return Transform.scale(
-              scale: scale,
-              child: Material(
-                color: Colors.transparent,
-                elevation: 6 * animation.value,
+      sliver: SliverReorderableList(
+        key: ValueKey(_currentFilter),
+        itemCount: filtered.length,
+        buildDefaultDragHandles: false,
+        onReorderItem: _reorderTodos,
+        proxyDecorator: (child, index, animation) {
+          return AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) {
+              final scale = 1.0 + animation.value * 0.025;
+              return Transform.scale(
+                scale: scale,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 6 * animation.value,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  child: child,
+                ),
+              );
+            },
+          );
+        },
+        itemBuilder: (context, index) {
+          final todo = filtered[index];
+          return Dismissible(
+            key: ValueKey(todo.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.priorityHigh.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                child: child,
               ),
-            );
-          },
-        );
-      },
-      itemBuilder: (context, index) {
-        final todo = filtered[index];
-        return Dismissible(
-          key: ValueKey(todo.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.priorityHigh.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              child: const Icon(
+                Icons.delete_outline,
+                color: AppTheme.priorityHigh,
+                size: 24,
+              ),
             ),
-            child: const Icon(
-              Icons.delete_outline,
-              color: AppTheme.priorityHigh,
-              size: 24,
-            ),
-          ),
-          onDismissed: (_) => _deleteTodo(todo.id),
-          child: _buildTodoItem(todo, index, filtered.length),
-        );
-      },
+            onDismissed: (_) => _deleteTodo(todo.id),
+            child: _buildTodoItem(todo, index, filtered.length),
+          );
+        },
+      ),
     );
   }
 
