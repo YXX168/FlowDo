@@ -841,7 +841,6 @@ class _HomeScreenState extends State<HomeScreen> {
       sliver: SliverReorderableList(
         key: ValueKey(_currentFilter),
         itemCount: filtered.length,
-        buildDefaultDragHandles: false,
         onReorderItem: _reorderTodos,
         proxyDecorator: (child, index, animation) {
           return AnimatedBuilder(
