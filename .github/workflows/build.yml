@@ -100,7 +100,7 @@ jobs:
           fi
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: flowdo-arm64-apk
           path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
